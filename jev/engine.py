@@ -6,7 +6,7 @@ import sqlite3
 import time
 import weakref
 from collections import OrderedDict, deque
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass, replace
 from typing import Protocol
 
 from .client import JevError
@@ -34,6 +34,57 @@ class Message:
     persona: str = ""
     persona_id: str = ""
     persona_status: str = "unresolved"
+
+
+NON_TEXT = "（图片/表情等读不到的内容）"
+
+
+def speaker(message: Message, names: dict[str, str]) -> str:
+    """为本次请求分配可读的说话人标签，平台 ID 不外发。
+
+    Args:
+        message: 待渲染的消息。
+        names: 本次请求内「发送者 ID → 标签」映射，会被就地填充。
+
+    Returns:
+        机器人 / 对方 / 成员N 形式的标签。
+    """
+    if message.role == "assistant":
+        return "机器人"
+    if message.private:
+        return "对方"
+    if message.sender not in names:
+        names[message.sender] = f"成员{len(names) + 1}"
+    return names[message.sender]
+
+
+def render_line(message: Message, names: dict[str, str]) -> str:
+    """把消息渲染成一行可读文本，撤回等内部状态翻译成自然语言。
+
+    Args:
+        message: 待渲染的消息。
+        names: 本次请求内的说话人映射。
+
+    Returns:
+        形如「成员2：活动昨天打完了」的一行文本。
+    """
+    line = f"{speaker(message, names)}：{message.text or NON_TEXT}"
+    return line + "〔这条已被撤回〕" if message.recalled else line
+
+
+def render_scene(message: Message) -> str:
+    """只在确实被点名时写正向说明，避免向模型断言「未被@」。
+
+    Args:
+        message: 当前触发消息。
+
+    Returns:
+        〔〕内使用的场景说明。
+    """
+    tags = ["私聊" if message.private else "群聊"]
+    if message.addressed:
+        tags.append("机器人被@了")
+    return "，".join(tags)
 
 
 class Engine:
@@ -114,24 +165,19 @@ class Engine:
         if stage != "probe" and not self.active(message.private):
             return True
         policy = self.policy
-        target = asdict(message)
-        target.pop("persona")
-        conversation = []
+        pending = []
         remaining = 12000
         for item in reversed(self.contexts.get(message.session, ())):
             if remaining <= 0:
                 break
-            entry = {
-                key: value
-                for key, value in asdict(item).items()
-                if key not in ("persona", "persona_id", "persona_status")
-            }
-            entry["text"] = entry["text"][:remaining]
-            remaining -= len(entry["text"])
-            conversation.append(entry)
+            item_text = item.text[:remaining]
+            remaining -= len(item_text)
+            pending.append(replace(item, text=item_text))
+        names: dict[str, str] = {}
+        conversation = [render_line(item, names) for item in reversed(pending)]
         state = {
-            "target": target,
-            "conversation": list(reversed(conversation)),
+            "target": f"{render_line(message, names)}〔{render_scene(message)}〕",
+            "conversation": conversation,
             "candidate_reply": candidate[: cfg.text_limit],
         }
         record = {

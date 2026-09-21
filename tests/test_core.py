@@ -6,7 +6,7 @@ import pytest
 
 from jev.client import JevError
 from jev.config import Settings
-from jev.engine import Engine, Message
+from jev.engine import Engine, Message, render_line, render_scene
 from jev.history import History
 from jev.policy import Policy
 
@@ -47,7 +47,7 @@ async def test_threshold_and_history(setup_engine, probability, allowed):
     assert await engine.decide("pre", msg) is allowed
     record = store.recent()[0]
     assert record["allowed"] is allowed
-    assert record["state"]["target"]["text"] == "hello"
+    assert record["state"]["target"] == "成员1：hello〔群聊〕"
     assert record["instructions"] == judge.calls[0][2]
     assert record["model"] == "fake-jev"
 
@@ -155,7 +155,7 @@ async def test_latest_context_is_used_for_post(setup_engine):
     await engine.decide("pre", msg)
     engine.observe(Message("g", "2", "u", "不要回答了"))
     await engine.decide("post", msg, "answer")
-    assert judge.calls[-1][0]["conversation"][-1]["text"] == "不要回答了"
+    assert judge.calls[-1][0]["conversation"][-1] == "成员1：不要回答了"
 
 
 async def test_persona_follows_template(setup_engine):
@@ -177,10 +177,32 @@ async def test_persona_follows_template(setup_engine):
     engine.policy = Policy("规则：{{persona}}", "发送？")
     assert await engine.decide("pre", msg)
     assert "秘密人格" in judge.calls[-1][2]
-    assert "persona" not in store.recent()[0]["state"]["target"]
+    assert "custom" not in json.dumps(store.recent()[0]["state"], ensure_ascii=False)
     msg.persona_status = "unavailable"
     assert await engine.decide("post", msg, "answer")
     assert store.recent()[0]["reason"] == "threshold"
+
+
+def test_transcript_rendering_uses_readable_labels():
+    names: dict[str, str] = {}
+    people = [
+        Message("g", "1", "alice", "先说话"),
+        Message("g", "2", "bot", "收到", role="assistant"),
+        Message("g", "3", "alice", "", recalled=True),
+        Message("g", "4", "bob", "后说话"),
+    ]
+    assert [render_line(item, names) for item in people] == [
+        "成员1：先说话",
+        "机器人：收到",
+        "成员1：（图片/表情等读不到的内容）〔这条已被撤回〕",
+        "成员2：后说话",
+    ]
+    assert render_scene(people[0]) == "群聊"
+    assert render_scene(Message("p", "5", "alice", "x", private=True)) == "私聊"
+    assert (
+        render_scene(Message("g", "6", "alice", "x", addressed=True))
+        == "群聊，机器人被@了"
+    )
 
 
 def test_policy_validation_and_atomic_persistence(tmp_path):
@@ -263,5 +285,6 @@ async def test_context_total_budget(setup_engine):
         engine.observe(Message("g", str(number), "u", "x" * 4000))
     await engine.decide("pre", Message("g", "target", "u", "x"))
     context = judge.calls[0][0]["conversation"]
-    assert sum(len(item["text"]) for item in context) <= 12000
-    assert context[-1]["message_id"] == "19"
+    assert sum(len(line) for line in context) <= 12000 + 3 * len("成员1：")
+    assert context[-1] == "成员1：" + "x" * 4000
+    assert len(context) == 3

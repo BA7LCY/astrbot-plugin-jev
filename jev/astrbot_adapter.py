@@ -104,7 +104,7 @@ class AstrBotAdapter:
             session=self.session_key(event),
             message_id=str(event.message_obj.message_id),
             sender=str(event.get_sender_id()),
-            text=event.message_str or "[非文本消息]",
+            text=event.message_str,
             private=event.is_private_chat(),
             addressed=bool(event.is_at_or_wake_command),
         )

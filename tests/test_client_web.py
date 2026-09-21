@@ -238,7 +238,10 @@ async def test_probe_writes_history_and_history_paginates(console):
     assert status == 200 and data["allowed"] is True
     status, rows = await call(handlers["history"][0])
     assert status == 200 and rows["records"][0]["stage"] == "probe"
-    assert rows["records"][0]["state"]["target"]["sender"] == "synthetic-user"
+    probe_target = rows["records"][0]["state"]["target"]
+    assert probe_target.startswith("成员1：")
+    assert probe_target.endswith("〔群聊，机器人被@了〕")
+    assert "synthetic-user" not in json.dumps(rows["records"][0]["state"])
     assert not engine.contexts
     last = rows["records"][-1]["id"]
     assert (await call(handlers["history"][0], "GET", {"before": str(last)}))[1][
