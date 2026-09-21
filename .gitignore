@@ -1,0 +1,24 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.pytest-tmp-*/
+.ruff_cache/
+.coverage
+htmlcov/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+data/
+*.log
+webui/node_modules/
+/.pi/
+.deploy.local.md
+scripts/deploy_git.sh
+
+# Local-only tooling and docs
+.agents/
+.trae/
+docs/
+
