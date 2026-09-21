@@ -143,12 +143,8 @@ def build_handlers(state: dict[str, Engine | None], policy_path: Path | None) ->
         persona_text = message.persona if message else ""
         return json_response(
             {
-                "pre": draft.render(
-                    "pre", current.settings.bot_description, persona_text
-                ),
-                "post": draft.render(
-                    "post", current.settings.bot_description, persona_text
-                ),
+                "pre": draft.render("pre", persona_text),
+                "post": draft.render("post", persona_text),
                 "persona_id": message.persona_id if message else "",
                 "persona_status": message.persona_status if message else "no_session",
                 "note": "预览使用所选会话最近的已解析快照；真实判断时重新读取当前人格。",

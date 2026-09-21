@@ -132,7 +132,6 @@ class Engine:
             remaining -= len(entry["text"])
             conversation.append(entry)
         state = {
-            "bot_description": cfg.bot_description,
             "target": target,
             "conversation": list(reversed(conversation)),
             "candidate_reply": candidate[: cfg.text_limit],
@@ -147,7 +146,7 @@ class Engine:
             "probability": None,
             "allowed": True,
             "reason": "disabled",
-            "instructions": policy.render(stage, cfg.bot_description, message.persona),
+            "instructions": policy.render(stage, message.persona),
             "include_persona": policy.include_persona,
         }
         start = time.monotonic()

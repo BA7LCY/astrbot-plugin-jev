@@ -6,9 +6,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 PRE_PROMPT = """你在决定聊天机器人是否应该接话，而不是生成回复。
-机器人设定：{{bot_description}}
-可选的 AstrBot 当前会话人格：
-{{persona}}
+机器人设定：{{persona}}
 
 根据 state.target 和 state.conversation 判断现在接话是否自然、必要：
 - 用户明确向机器人提问、求助或接续机器人的话题时，倾向接话。
@@ -18,9 +16,7 @@ PRE_PROMPT = """你在决定聊天机器人是否应该接话，而不是生成�
 是否应该接话？"""
 
 POST_PROMPT = """判断 state.candidate_reply 是否仍适合现在发送，而不是生成新回复。
-机器人设定：{{bot_description}}
-可选的 AstrBot 当前会话人格：
-{{persona}}
+机器人设定：{{persona}}
 
 结合原消息 state.target 和最新 state.conversation：
 - 用户已取消问题、话题已过时、回复重复或明显不相关时，不要发送。
@@ -59,40 +55,25 @@ class Policy:
             text = values[name]
             if not isinstance(text, str) or not 1 <= len(text.strip()) <= 6000:
                 raise ValueError("每个模板需包含 1～6000 个字符")
-            unknown = set(re.findall(r"\{\{(.*?)\}\}", text)) - {
-                "persona",
-                "bot_description",
-            }
+            unknown = set(re.findall(r"\{\{(.*?)\}\}", text)) - {"persona"}
             if unknown:
-                raise ValueError("仅支持 {{persona}} 和 {{bot_description}} 变量")
-            if any(
-                text.count("{{" + variable + "}}") > 1
-                for variable in ("persona", "bot_description")
-            ):
-                raise ValueError("每个变量在一个模板中最多插入一次")
+                raise ValueError("仅支持 {{persona}} 变量")
+            if text.count("{{persona}}") > 1:
+                raise ValueError("{{persona}} 在一个模板中最多插入一次")
         return cls(**values)
 
-    def render(self, stage: str, description: str, persona: str) -> str:
+    def render(self, stage: str, persona: str) -> str:
         """一次性替换变量，变量值内的模板语法不会再次展开。
 
         Args:
             stage: pre/probe 使用接话模板，其他使用发送模板。
-            description: 插件中的机器人设定。
-            persona: 当前会话已解析的人格。
+            persona: 当前会话已解析的 AstrBot 人格提示词。
 
         Returns:
             该次判断的最终指令。
         """
-        values = {
-            "bot_description": description,
-            "persona": persona if self.include_persona else "",
-        }
         template = self.pre_prompt if stage in ("pre", "probe") else self.post_prompt
-        return re.sub(
-            r"\{\{(persona|bot_description)\}\}",
-            lambda match: values[match.group(1)],
-            template,
-        )
+        return template.replace("{{persona}}", persona if self.include_persona else "")
 
     def save(self, path: Path) -> None:
         """原子保存模板，并保留上一份配置备份。

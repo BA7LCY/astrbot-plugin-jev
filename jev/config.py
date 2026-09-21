@@ -24,7 +24,6 @@ class Settings:
     max_sessions: int = 128
     text_limit: int = 2000
     history_limit: int = 1000
-    bot_description: str = "群聊中的聊天助手，自然、克制，不打断他人对话。"
 
     @classmethod
     def load(cls, values: dict) -> "Settings":
@@ -69,6 +68,4 @@ class Settings:
                 raise ValueError(f"Out-of-range setting: {name}")
         if not result.model.strip():
             raise ValueError("Empty model")
-        if len(result.bot_description) > 2000:
-            raise ValueError("bot_description exceeds 2000 characters")
         return result

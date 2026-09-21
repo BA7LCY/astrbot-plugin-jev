@@ -166,7 +166,7 @@ async def test_persona_template_and_privacy(setup_engine):
     engine.observe(msg)
     await engine.decide("pre", msg)
     assert "秘密人格" not in json.dumps(store.recent(), ensure_ascii=False)
-    engine.policy = Policy("规则：{{persona}} / {{bot_description}}", "发送？", True)
+    engine.policy = Policy("规则：{{persona}}", "发送？", True)
     await engine.decide("pre", msg)
     assert "秘密人格" in judge.calls[-1][2]
     assert store.recent()[0]["include_persona"] is True
@@ -176,10 +176,9 @@ async def test_persona_template_and_privacy(setup_engine):
 
 
 def test_policy_validation_and_atomic_persistence(tmp_path):
-    p = Policy("{{persona}} / {{bot_description}}", "发送？", True)
-    assert (
-        p.render("pre", "设定", "{{bot_description}}") == "{{bot_description}} / 设定"
-    )
+    p = Policy("设定：{{persona}} / 结尾", "发送？", True)
+    assert p.render("pre", "{{persona}}") == "设定：{{persona}} / 结尾"
+    assert Policy("设定：{{persona}}", "发送？").render("pre", "人格") == "设定："
     path = tmp_path / "policy.json"
     p.save(path)
     Policy().save(path)
@@ -189,6 +188,7 @@ def test_policy_validation_and_atomic_persistence(tmp_path):
     ) == asdict(p)
     for data in [
         {**asdict(p), "pre_prompt": "{{unknown}}"},
+        {**asdict(p), "pre_prompt": "{{bot_description}}"},
         {**asdict(p), "pre_prompt": "{{persona}}{{persona}}"},
         {**asdict(p), "include_persona": "false"},
         {**asdict(p), "pre_prompt": ""},

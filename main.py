@@ -46,9 +46,13 @@ class JevPlugin(Star):
                 )
             engine = Engine(cfg, JevClient(cfg, self.session), history)
             if policy_path.exists():
-                engine.policy = Policy.parse(
-                    json.loads(policy_path.read_text(encoding="utf-8"))
-                )
+                try:
+                    engine.policy = Policy.parse(
+                        json.loads(policy_path.read_text(encoding="utf-8"))
+                    )
+                except (ValueError, json.JSONDecodeError) as error:
+                    # 旧版本模板不能让插件起不来。
+                    self.logger.warning(f"Ignored invalid policy.json: {error}")
             self.adapter = AstrBotAdapter(engine, self.context)
             self.engine_slot["engine"] = engine
             for endpoint, (handler, methods) in build_handlers(

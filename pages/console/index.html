@@ -28,7 +28,7 @@
       <section id="policy" class="panel tab-panel">
         <div class="section-title"><div><h2>把你的规则，交给 Jev</h2><p class="muted">编辑后保存，下一次判断立即生效。不会修改 AstrBot 原本的人格。</p></div><span class="pill">提示词模板</span></div>
         <label class="toggle"><input id="include-persona" type="checkbox"> 引用当前会话实际使用的 AstrBot 人格</label>
-        <p class="hint">变量：<code>{{persona}}</code> 当前人格 · <code>{{bot_description}}</code> 机器人设定。人格引用关闭时变量为空；每个变量在每个模板中最多使用一次。</p>
+        <p class="hint">变量：<code>{{persona}}</code> —— 当前会话生效的 AstrBot 人格提示词，也就是「机器人设定」这一行的来源；未勾选引用时为空。每个模板最多使用一次。</p>
         <div class="editors">
           <div><div class="row"><label for="pre-prompt">01 / 接话判断</label><button type="button" class="quiet insert" data-target="pre-prompt">插入人格变量</button></div><textarea id="pre-prompt" rows="15" maxlength="6000" spellcheck="false"></textarea></div>
           <div><div class="row"><label for="post-prompt">02 / 发送复核</label><button type="button" class="quiet insert" data-target="post-prompt">插入人格变量</button></div><textarea id="post-prompt" rows="15" maxlength="6000" spellcheck="false"></textarea></div>

@@ -172,7 +172,7 @@ async def test_status_reports_state_and_never_leaks_secrets(console):
 
 
 POLICY_BODY = {"preview"}
-VALID = asdict(Policy("前 {{persona}}", "后 {{bot_description}}", True))
+VALID = asdict(Policy("前 {{persona}}", "后 {{persona}}", True))
 
 
 async def test_every_endpoint_reports_unready_without_engine(console):
@@ -213,7 +213,7 @@ async def test_preview_uses_resolved_persona_snapshot_without_deciding(console):
     )
     assert status == 200
     assert data["pre"] == "前 会话人格"
-    assert data["post"] == "后 群聊中的聊天助手，自然、克制，不打断他人对话。"
+    assert data["post"] == "后 会话人格"
     assert data["persona_status"] == "resolved"
     assert engine.decisions == 0
     assert (await call(handlers["preview"][0], "POST", None, {"policy": VALID}))[

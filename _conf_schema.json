@@ -106,11 +106,5 @@
     "type": "int",
     "default": 1000,
     "hint": "1～10000，保存新记录时清理旧记录。"
-  },
-  "bot_description": {
-    "description": "机器人基本设定",
-    "type": "string",
-    "default": "群聊中的聊天助手，自然、克制，不打断他人对话。",
-    "hint": "最多 2000 字符，通过模板中的 {{bot_description}} 引用。模板和人格引用开关在插件详情页的 Jev 控制台 Page 编辑。"
   }
 }
