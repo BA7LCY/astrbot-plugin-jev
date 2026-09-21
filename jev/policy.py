@@ -16,7 +16,6 @@ PRE_PROMPT = """你在决定聊天机器人是否应该接话，而不是生成�
 是否应该接话？"""
 
 POST_PROMPT = """判断 state.candidate_reply 是否仍适合现在发送，而不是生成新回复。
-机器人设定：{{persona}}
 
 结合原消息 state.target 和最新 state.conversation：
 - 用户已取消问题、话题已过时、回复重复或明显不相关时，不要发送。

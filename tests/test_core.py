@@ -38,9 +38,7 @@ def setup_engine(tmp_path):
     return build
 
 
-@pytest.mark.parametrize(
-    "probability,allowed", [(0.64, False), (0.65, True), (1, True)]
-)
+@pytest.mark.parametrize("probability,allowed", [(0.49, False), (0.5, True), (1, True)])
 async def test_threshold_and_history(setup_engine, probability, allowed):
     engine, judge, store = setup_engine()
     judge.probability = probability

@@ -80,8 +80,8 @@
   "threshold": {
     "description": "放行概率阈值",
     "type": "float",
-    "default": 0.65,
-    "hint": "0～1，Noul 概率大于等于此值才放行。"
+    "default": 0.5,
+    "hint": "0～1，Noul 概率大于等于此值才放行。线上实测：被 @ 或私聊追问 0.72～0.90，群聊无关闲聊与图片消息 0.06～0.45，发送复核 0.5～0.65。"
   },
   "context_messages": {
     "description": "每会话上下文条数",

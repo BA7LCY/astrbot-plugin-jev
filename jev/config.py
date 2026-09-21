@@ -19,7 +19,7 @@ class Settings:
     api_key: str = ""
     model: str = "jev-latest"
     timeout_seconds: float = 8.0
-    threshold: float = 0.65
+    threshold: float = 0.5
     context_messages: int = 20
     max_sessions: int = 128
     text_limit: int = 2000
