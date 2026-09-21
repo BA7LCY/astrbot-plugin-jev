@@ -1,0 +1,140 @@
+{
+  "enabled": {
+    "description": "启用 Jev 插件",
+    "type": "bool",
+    "default": false,
+    "hint": "默认关闭。配置 API 密钥后启用；聊天上下文会发送给 TypeSafe。"
+  },
+  "group_enabled": {
+    "description": "群聊接管",
+    "type": "bool",
+    "default": true,
+    "hint": "仍遵守 AstrBot 群白名单和会话开关。"
+  },
+  "private_enabled": {
+    "description": "私聊接管",
+    "type": "bool",
+    "default": false,
+    "hint": "默认关闭，关闭时私聊保持宿主原行为。"
+  },
+  "pre_check_enabled": {
+    "description": "接话前判断",
+    "type": "bool",
+    "default": true,
+    "hint": "开启后会判断普通群聊是否值得主动接话；关闭时保持宿主唤醒规则。"
+  },
+  "post_check_enabled": {
+    "description": "生成后发送复核",
+    "type": "bool",
+    "default": true,
+    "hint": "启用时受管回复关闭流式输出，完整生成后再判断。"
+  },
+  "recall_enabled": {
+    "description": "撤回硬拦截",
+    "type": "bool",
+    "default": true,
+    "hint": "OneBot v11 撤回通知；独立于 Jev 判断，开启时同样关闭流式输出。"
+  },
+  "history_enabled": {
+    "description": "保存判断历史",
+    "type": "bool",
+    "default": true,
+    "hint": "上下文、候选回复和模板明文保存在本地 SQLite，关闭不删除已有记录。"
+  },
+  "context_enabled": {
+    "description": "收集近期上下文",
+    "type": "bool",
+    "default": true,
+    "hint": "关闭后仅判断当前消息和候选回复。"
+  },
+  "bypass_commands": {
+    "description": "插件命令旁路",
+    "type": "bool",
+    "default": true,
+    "hint": "已匹配的 AstrBot/插件命令不参与判断。"
+  },
+  "fail_open": {
+    "description": "Jev 故障时放行",
+    "type": "bool",
+    "default": false,
+    "hint": "默认关闭。超时、缺密钥、429 等均拒绝；开启后可能增加打扰，不会绕过撤回硬规则。"
+  },
+  "api_key": {
+    "description": "TypeSafe API Key",
+    "type": "string",
+    "default": "",
+    "hint": "仅填写到这里，不要填到提示词模板。使用官方 systemone 接口，不是 OpenAI 兼容接口。"
+  },
+  "model": {
+    "description": "Jev 模型",
+    "type": "string",
+    "default": "jev-latest",
+    "hint": "默认 jev-latest，也可固定官方版本 ID。"
+  },
+  "timeout_seconds": {
+    "description": "判断超时（秒）",
+    "type": "float",
+    "default": 8.0,
+    "hint": "0.1～60，包含最多四个并发请求的排队时间；不自动重试。"
+  },
+  "threshold": {
+    "description": "放行概率阈值",
+    "type": "float",
+    "default": 0.65,
+    "hint": "0～1，Noul 概率大于等于此值才放行。"
+  },
+  "context_messages": {
+    "description": "每会话上下文条数",
+    "type": "int",
+    "default": 20,
+    "hint": "1～50，额外受 12000 字符总预算限制。"
+  },
+  "max_sessions": {
+    "description": "最多缓存会话数",
+    "type": "int",
+    "default": 128,
+    "hint": "1～1000，超出时淘汰最久未使用会话。"
+  },
+  "text_limit": {
+    "description": "单条文本字符上限",
+    "type": "int",
+    "default": 2000,
+    "hint": "100～4000，超过会截断；Jev 不直接读取图片或音频。"
+  },
+  "history_limit": {
+    "description": "历史保留条数",
+    "type": "int",
+    "default": 1000,
+    "hint": "1～10000，保存新记录时清理旧记录。"
+  },
+  "webui_enabled": {
+    "description": "启用 WebUI",
+    "type": "bool",
+    "default": false,
+    "hint": "默认关闭。启用前设置不少于 16 字符的独立访问令牌。"
+  },
+  "webui_host": {
+    "description": "WebUI 监听地址",
+    "type": "string",
+    "default": "127.0.0.1",
+    "hint": "仅允许 127.0.0.1 或 ::1；远程访问请自行使用安全隧道或 HTTPS 反向代理。"
+  },
+  "webui_port": {
+    "description": "WebUI 端口",
+    "type": "int",
+    "default": 6196,
+    "hint": "1024～65535，默认 6196。"
+  },
+  "webui_token": {
+    "description": "WebUI 访问令牌",
+    "type": "string",
+    "default": "",
+    "hint": "不少于 16 字符，建议随机生成 32 字符；不要复用 API 密钥。"
+  },
+  "bot_description": {
+    "description": "机器人基本设定",
+    "type": "string",
+    "default": "群聊中的聊天助手，自然、克制，不打断他人对话。",
+    "hint": "最多 2000 字符，通过模板中的 {{bot_description}} 引用。模板和人格引用开关在独立 WebUI 编辑。"
+  }
+}
