@@ -1,63 +1,55 @@
-"""仅绑定回环地址、使用 Bearer 鉴权的运行检查接口。"""
+"""AstrBot 内嵌 Pages 的后端 handler；不自行监听端口，鉴权由宿主登录态负责。"""
 
 import asyncio
-import hmac
 import sqlite3
+from collections.abc import Awaitable, Callable
 from dataclasses import asdict, fields
 from pathlib import Path
 
-from aiohttp import web
+from astrbot.api.web import error_response, json_response, request
 
 from .config import Settings
 from .engine import Engine, Message
 from .policy import Policy
 
 
-def create_app(engine: Engine, policy_path: Path | None = None) -> web.Application:
-    """构建可独立测试的 WebUI，不暴露任何配置密钥。
+def build_handlers(state: dict[str, Engine | None], policy_path: Path | None) -> dict:
+    """构建控制台接口，页面在受限 iframe 内经 bridge 调用。
 
     Args:
-        engine: 注入的核心服务。
+        state: 可变引擎槽位；engine 为 None 表示插件尚未就绪。
         policy_path: 模板持久化路径；未指定时禁止修改。
 
     Returns:
-        带运行检查、手动探针和历史分页的 aiohttp 应用。
+        bridge endpoint 到 (handler, methods) 的映射。
     """
     probe_lock = asyncio.Lock()
     policy_lock = asyncio.Lock()
-    assets = Path(__file__).resolve().parent.parent / "webui"
 
-    @web.middleware
-    async def protect(request, handler):
-        if request.path.startswith("/api/"):
-            expected = f"Bearer {engine.settings.webui_token}"
-            supplied = request.headers.get("Authorization", "")
-            if not engine.settings.webui_token or not hmac.compare_digest(
-                supplied.encode(), expected.encode()
-            ):
-                raise web.HTTPUnauthorized()
-            if request.method != "GET" and request.headers.get("Origin"):
-                if request.headers["Origin"] != f"{request.scheme}://{request.host}":
-                    raise web.HTTPForbidden()
-        try:
-            response = await handler(request)
-        except (OSError, sqlite3.Error):
-            response = web.json_response({"error": "storage_unavailable"}, status=503)
-        response.headers.update(
-            {
-                "Cache-Control": "no-store",
-                "X-Content-Type-Options": "nosniff",
-                "Referrer-Policy": "no-referrer",
-                "Content-Security-Policy": "default-src 'self'; "
-                "script-src 'self'; style-src 'self'; connect-src 'self'; "
-                "frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
-            }
-        )
-        return response
+    def guard(handler: Callable[[], Awaitable]) -> Callable:
+        """把存储故障转成不含敏感细节的状态码。
 
-    async def status(request):
-        cfg = engine.settings
-        return web.json_response(
+        Args:
+            handler: 原始异步接口。
+
+        Returns:
+            带异常兜底的接口。
+        """
+
+        async def wrapped():
+            try:
+                return await handler()
+            except (OSError, sqlite3.Error):
+                return error_response("storage_unavailable", status_code=503)
+
+        return wrapped
+
+    async def status():
+        current = state.get("engine")
+        if current is None:
+            return error_response("插件未就绪", status_code=503)
+        cfg = current.settings
+        return json_response(
             {
                 "enabled": cfg.enabled,
                 "api_configured": bool(cfg.api_key.strip()),
@@ -68,10 +60,10 @@ def create_app(engine: Engine, policy_path: Path | None = None) -> web.Applicati
                     for field in fields(Settings)
                     if type(getattr(cfg, field.name)) is bool
                 },
-                "decisions": engine.decisions,
-                "blocked": engine.blocked,
-                "history_error": engine.history_error,
-                "last_decision": engine.last_decision,
+                "decisions": current.decisions,
+                "blocked": current.blocked,
+                "history_error": current.history_error,
+                "last_decision": current.last_decision,
                 "recall_support": "OneBot v11 group_recall / friend_recall",
                 "scope": "AstrBot pipeline replies; direct tool/plugin sends excluded",
                 "sessions": [
@@ -86,79 +78,76 @@ def create_app(engine: Engine, policy_path: Path | None = None) -> web.Applicati
                             "",
                         ),
                     }
-                    for key, items in engine.contexts.items()
+                    for key, items in current.contexts.items()
                     if items
                 ],
             }
         )
 
-    async def history(request):
+    async def history():
+        current = state.get("engine")
+        if current is None:
+            return error_response("插件未就绪", status_code=503)
         try:
             before = int(request.query.get("before", "0"))
             if before < 0:
                 raise ValueError
         except ValueError:
-            raise web.HTTPBadRequest() from None
+            return error_response("before 必须是非负整数", status_code=400)
         rows = (
-            await asyncio.to_thread(engine.history.recent, before)
-            if engine.history and engine.settings.history_enabled
+            current.history.recent(before)
+            if current.history and current.settings.history_enabled
             else []
         )
-        return web.json_response({"records": rows})
+        return json_response({"records": rows})
 
-    async def probe(request):
-        if probe_lock.locked():
-            return web.json_response({"error": "probe_busy"}, status=429)
-        async with probe_lock:
-            message = Message(
-                "diagnostic",
-                "probe",
-                "synthetic-user",
-                "你好，机器人，能和我打个招呼吗？",
-                addressed=True,
-            )
-            allowed = await engine.decide("probe", message)
-            return web.json_response(
-                {"allowed": allowed, "last_decision": engine.last_decision}
-            )
+    async def get_policy():
+        current = state.get("engine")
+        if current is None:
+            return error_response("插件未就绪", status_code=503)
+        return json_response(
+            {"policy": asdict(current.policy), "defaults": asdict(Policy())}
+        )
 
-    async def policy(request):
-        if request.method == "GET":
-            return web.json_response(
-                {"policy": asdict(engine.policy), "defaults": asdict(Policy())}
-            )
+    async def save_policy():
+        current = state.get("engine")
+        if current is None:
+            return error_response("插件未就绪", status_code=503)
         if policy_path is None:
-            raise web.HTTPForbidden()
+            return error_response("模板存储不可用", status_code=409)
         try:
-            updated = Policy.parse(await request.json())
+            updated = Policy.parse(await request.json(default={}))
         except (ValueError, TypeError):
-            return web.json_response({"error": "模板格式或变量不合法"}, status=400)
+            return error_response("模板格式或变量不合法", status_code=400)
         async with policy_lock:
             await asyncio.to_thread(updated.save, policy_path)
-            engine.policy = updated
-        return web.json_response({"policy": asdict(updated)})
+            current.policy = updated
+        return json_response({"policy": asdict(updated)})
 
-    async def preview(request):
+    async def preview():
+        current = state.get("engine")
+        if current is None:
+            return error_response("插件未就绪", status_code=503)
         try:
-            body = await request.json()
+            body = await request.json(default={})
             draft = Policy.parse(body["policy"])
             session_id = body.get("session", "")
             if not isinstance(session_id, str):
                 raise ValueError
         except (ValueError, KeyError, TypeError):
-            return web.json_response({"error": "预览参数不合法"}, status=400)
-        messages = engine.contexts.get(session_id, ())
+            return error_response("预览参数不合法", status_code=400)
+        messages = current.contexts.get(session_id, ())
         message = next(
             (item for item in reversed(messages) if item.role == "user"), None
         )
         persona_text = message.persona if message else ""
-        return web.json_response(
+        return json_response(
             {
                 "pre": draft.render(
-                    "pre", engine.settings.bot_description, persona_text
+                    "pre", current.settings.bot_description, persona_text
                 ),
                 "post": draft.render(
-                    "post", engine.settings.bot_description, persona_text
+                    "post", current.settings.bot_description, persona_text
                 ),
                 "persona_id": message.persona_id if message else "",
                 "persona_status": message.persona_status if message else "no_session",
@@ -166,19 +155,32 @@ def create_app(engine: Engine, policy_path: Path | None = None) -> web.Applicati
             }
         )
 
-    async def asset(request):
-        name = request.match_info.get("name", "index.html")
-        if name not in ("index.html", "app.js", "style.css"):
-            raise web.HTTPNotFound()
-        return web.FileResponse(assets / name)
+    async def probe():
+        current = state.get("engine")
+        if current is None:
+            return error_response("插件未就绪", status_code=503)
+        if probe_lock.locked():
+            return error_response("已有探针在运行", status_code=429)
+        async with probe_lock:
+            allowed = await current.decide(
+                "probe",
+                Message(
+                    "diagnostic",
+                    "probe",
+                    "synthetic-user",
+                    "你好，机器人，能和我打个招呼吗？",
+                    addressed=True,
+                ),
+            )
+            return json_response(
+                {"allowed": allowed, "last_decision": current.last_decision}
+            )
 
-    app = web.Application(middlewares=[protect], client_max_size=65536)
-    app.router.add_get("/", asset)
-    app.router.add_get("/assets/{name}", asset)
-    app.router.add_get("/api/status", status)
-    app.router.add_get("/api/history", history)
-    app.router.add_post("/api/probe", probe)
-    app.router.add_get("/api/policy", policy)
-    app.router.add_post("/api/policy", policy)
-    app.router.add_post("/api/preview", preview)
-    return app
+    return {
+        "status": (guard(status), ["GET"]),
+        "history": (guard(history), ["GET"]),
+        "policy": (guard(get_policy), ["GET"]),
+        "policy/save": (guard(save_policy), ["POST"]),
+        "preview": (guard(preview), ["POST"]),
+        "probe": (guard(probe), ["POST"]),
+    }

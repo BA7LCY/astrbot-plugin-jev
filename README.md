@@ -7,13 +7,13 @@
 1. 将此目录放入 AstrBot 的 `data/plugins`，在插件管理中加载。当前针对 AstrBot **4.27.4** 验证，元数据限定 `<4.28.0`。
 2. 在插件配置填写 TypeSafe `api_key`。使用官方 `POST /v1/systemone`，不是 OpenAI 兼容接口；模型默认 `jev-latest`。
 3. 开启 `enabled`。群聊默认纳入判断；私聊必须另开 `private_enabled`。插件默认总开关关闭，防止未配置时意外拦截。
-4. 需要控制台时，开启 `webui_enabled`，设置至少 16 字符的独立随机 `webui_token`。重新加载后在浏览器打开 `http://127.0.0.1:6196`，输入令牌。
+4. 控制台无需额外开关或端口：重新加载插件后，在 AstrBot WebUI 的插件管理中进入本插件详情页，打开 **Jev 控制台** Page。新增或删除 `pages/` 下的目录需要重载插件才会被发现。
 
-已有 `aiohttp` 即可，无额外 SDK、前端构建或数据库服务。修改宿主插件配置后重新加载；WebUI 模板保存后下一次判断立即生效。此仓库不修改宿主 dashboard/OpenAPI，因此不需要生成宿主 API client。
+已有 `aiohttp` 即可，无额外 SDK、前端构建或数据库服务。修改宿主插件配置后重新加载；Page 内模板保存后下一次判断立即生效。此仓库不修改宿主 dashboard/OpenAPI，因此不需要生成宿主 API client。
 
 ## 提示词模板与人格变量
 
-WebUI「判断规则」提供两套可编辑模板：**接话判断**、**发送复核**。
+控制台 Page「判断规则」提供两套可编辑模板：**接话判断**、**发送复核**。
 
 - `{{bot_description}}`：插件配置中的机器人基本设定。
 - `{{persona}}`：当前会话实际选中的 AstrBot 人格提示词；必须勾选「引用当前会话人格」才会传入，默认关闭。
@@ -38,7 +38,8 @@ WebUI「判断规则」提供两套可编辑模板：**接话判断**、**发送
 | `history_enabled` | 保存并开放历史查询；关闭不会删除已保存记录 |
 | `bypass_commands` | 默认对宿主已识别的插件命令旁路 |
 | `fail_open` | 默认关闭；API / 人格读取失败拒绝，开启则放行，但撤回仍拒绝 |
-| `webui_enabled` | 独立控制运行检查 WebUI |
+
+控制台没有独立开关、端口或令牌：插件加载后即作为宿主 Pages 提供。
 
 上下文默认每会话 20 条、最多 128 个会话，单条 2000 字符且总文本预算 12000 字符。历史默认保留最近 1000 条，SQLite 跨重启保留，内存上下文不跨重启。
 
@@ -54,7 +55,7 @@ WebUI「判断规则」提供两套可编辑模板：**接话判断**、**发送
 - Jev 仅接收文本/结构化文本。图片、语音本身不上传到 Jev，依赖宿主预处理得到的文本；超长内容会截断，可能影响判断。
 - 开启判断意味着相关聊天文本会发送至 **TypeSafe**；启用人格变量也会向其发送人格提示词。只在获授权的群聊使用。
 - 本地历史含聊天内容及人格文本，**明文 SQLite** 存储于 AstrBot 数据目录的 `plugin_data/jev/history.db`。请使用系统目录权限保护；关闭历史不会自动擦除旧数据。
-- WebUI 只绑定回环地址，不支持直接公网监听。远程访问请自行配置安全隧道或有 HTTPS/鉴权的反向代理。令牌只在页面内存持有，不存浏览器 localStorage。
+- 控制台是宿主 Dashboard 内嵌 Page，不再有独立端口、监听地址或令牌。页面运行在受限 iframe（`allow-scripts allow-forms allow-downloads`）中，只能经 `window.AstrBotPluginPage` bridge 访问本插件注册的 API，读不到 Dashboard 的 cookie 与 localStorage。鉴权复用 Dashboard 登录态，因此**任何能登录 Dashboard 的用户都可编辑判断模板**；请把 Dashboard 本身放在受控网络内。
 - API 错误仅保存安全错误码，不记录密钥或 HTTP 错误正文。401/429/529/超时不自动重试，避免积压消息或额外请求。
 - 面板的「放行」是判断结果，不是送达确认。「调用 Jev 测试连接」只发送虚构问候，会产生真实用量，不测试真实聊天效果。
 
@@ -64,7 +65,7 @@ WebUI「判断规则」提供两套可编辑模板：**接话判断**、**发送
 python -m pytest -q --basetemp=.pytest-tmp-tests
 python -m ruff format --check main.py jev tests
 python -m ruff check main.py jev tests
-node --check webui/app.js
+node --check pages/console/app.js
 git diff --check
 ```
 

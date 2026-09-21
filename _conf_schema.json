@@ -107,34 +107,10 @@
     "default": 1000,
     "hint": "1～10000，保存新记录时清理旧记录。"
   },
-  "webui_enabled": {
-    "description": "启用 WebUI",
-    "type": "bool",
-    "default": false,
-    "hint": "默认关闭。启用前设置不少于 16 字符的独立访问令牌。"
-  },
-  "webui_host": {
-    "description": "WebUI 监听地址",
-    "type": "string",
-    "default": "127.0.0.1",
-    "hint": "仅允许 127.0.0.1 或 ::1；远程访问请自行使用安全隧道或 HTTPS 反向代理。"
-  },
-  "webui_port": {
-    "description": "WebUI 端口",
-    "type": "int",
-    "default": 6196,
-    "hint": "1024～65535，默认 6196。"
-  },
-  "webui_token": {
-    "description": "WebUI 访问令牌",
-    "type": "string",
-    "default": "",
-    "hint": "不少于 16 字符，建议随机生成 32 字符；不要复用 API 密钥。"
-  },
   "bot_description": {
     "description": "机器人基本设定",
     "type": "string",
     "default": "群聊中的聊天助手，自然、克制，不打断他人对话。",
-    "hint": "最多 2000 字符，通过模板中的 {{bot_description}} 引用。模板和人格引用开关在独立 WebUI 编辑。"
+    "hint": "最多 2000 字符，通过模板中的 {{bot_description}} 引用。模板和人格引用开关在插件详情页的 Jev 控制台 Page 编辑。"
   }
 }

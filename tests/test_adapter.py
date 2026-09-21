@@ -178,8 +178,21 @@ async def test_missing_persona_resolver_fails_closed(adapter):
 async def test_plugin_lifecycle_without_real_credentials():
     from astrbot_plugin_jev.main import JevPlugin
 
-    plugin = JevPlugin(SimpleNamespace(), {"enabled": False, "history_enabled": False})
+    registered = {}
+
+    def register_web_api(route, handler, methods, desc=""):
+        registered[route] = (handler, tuple(methods))
+
+    plugin = JevPlugin(
+        SimpleNamespace(register_web_api=register_web_api),
+        {"enabled": False, "history_enabled": False},
+    )
     await plugin.initialize()
     assert plugin.adapter is not None
+    assert set(registered) == {
+        f"/astrbot_plugin_jev/{name}"
+        for name in ("status", "history", "policy", "policy/save", "preview", "probe")
+    }
     await plugin.terminate()
     assert plugin.session is None
+    assert plugin.engine_slot["engine"] is None

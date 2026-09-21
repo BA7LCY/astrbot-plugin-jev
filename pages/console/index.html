@@ -4,21 +4,17 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Jev · 接话控制台</title>
-  <link rel="stylesheet" href="/assets/style.css">
-  <script src="/assets/app.js" defer></script>
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./app.js"></script>
 </head>
 <body>
   <main>
     <header>
       <div><div class="eyebrow">JEV / CONVERSATION GATE</div><h1>少一点打扰，<span>多一点恰好。</span></h1><p>接话判断 · 发送复核 · 撤回保护</p></div>
-      <span class="pill" id="connection">未连接</span>
+      <span class="pill" id="connection">加载中</span>
     </header>
-    <section id="login" class="panel">
-      <h2>连接控制台</h2><p class="muted">输入插件配置中的 WebUI 访问令牌。令牌仅保存在当前页面内存，刷新即清除。</p>
-      <form id="login-form" class="row"><label for="token">访问令牌</label><input id="token" type="password" autocomplete="off" required minlength="16"><button>连接</button></form>
-    </section>
     <p id="notice" role="status" aria-live="polite"></p>
-    <div id="workspace" hidden>
+    <div id="workspace">
       <div class="metrics">
         <section class="panel"><span class="eyebrow">运行状态</span><h2 id="running">—</h2><p id="model" class="muted"></p></section>
         <section class="panel"><span class="eyebrow">本次启动 / 判断</span><strong id="decisions">0</strong><p class="muted">包含旁路记录与手动探针</p></section>
@@ -28,7 +24,6 @@
         <button class="tab active" data-tab="policy">判断规则</button>
         <button class="tab" data-tab="history">判断历史</button>
         <button class="tab" data-tab="health">运行检查</button>
-        <button id="logout" class="quiet">断开连接</button>
       </nav>
       <section id="policy" class="panel tab-panel">
         <div class="section-title"><div><h2>把你的规则，交给 Jev</h2><p class="muted">编辑后保存，下一次判断立即生效。不会修改 AstrBot 原本的人格。</p></div><span class="pill">提示词模板</span></div>
@@ -54,7 +49,7 @@
         <p class="hint">撤回支持 OneBot v11 群聊 / 私聊通知。只保证受管的 AstrBot 回复管道，不拦截工具或其他插件绕过管道的直接发送；已进入平台网络发送的消息无法追回。</p>
       </section>
     </div>
-    <footer>Jev 决定要不要说，AstrBot 决定怎么说。<span>本地控制台 / 不使用第三方静态资源</span></footer>
+    <footer>Jev 决定要不要说，AstrBot 决定怎么说。<span>内嵌控制台 / 不使用第三方静态资源</span></footer>
   </main>
 </body>
 </html>

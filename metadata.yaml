@@ -1,6 +1,6 @@
 name: astrbot_plugin_jev
 display_name: Jev 接话判断
-desc: Jev 接话决策、生成后发送复核、OneBot 撤回拦截及带鉴权的运行检查面板。
+desc: Jev 接话决策、生成后发送复核、OneBot 撤回拦截，以及宿主内嵌的控制台 Page。
 version: v0.1.0
 author: LovieCode
 repo: ""

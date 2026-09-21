@@ -39,7 +39,7 @@ class Policy:
         """严格检查模板内容和允许的变量。
 
         Args:
-            values: WebUI 提交或磁盘读入的数据。
+            values: 控制台 Page 提交或磁盘读入的数据。
 
         Returns:
             已验证的模板。

@@ -212,10 +212,10 @@ def test_history_retention_and_pagination(tmp_path):
     [
         {"threshold": float("nan")},
         {"enabled": "false"},
-        {"webui_enabled": True},
-        {"webui_host": "0.0.0.0"},
         {"context_messages": 0},
-        {"webui_port": True},
+        {"text_limit": 50},
+        {"timeout_seconds": "8"},
+        {"model": "   "},
     ],
 )
 def test_config_validation(overrides):

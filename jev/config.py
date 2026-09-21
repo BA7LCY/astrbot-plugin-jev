@@ -24,10 +24,6 @@ class Settings:
     max_sessions: int = 128
     text_limit: int = 2000
     history_limit: int = 1000
-    webui_enabled: bool = False
-    webui_host: str = "127.0.0.1"
-    webui_port: int = 6196
-    webui_token: str = ""
     bot_description: str = "群聊中的聊天助手，自然、克制，不打断他人对话。"
 
     @classmethod
@@ -67,7 +63,6 @@ class Settings:
             "max_sessions": (1, 1000),
             "text_limit": (100, 4000),
             "history_limit": (1, 10000),
-            "webui_port": (1024, 65535),
         }
         for name, (low, high) in ranges.items():
             if not low <= getattr(result, name) <= high:
@@ -76,8 +71,4 @@ class Settings:
             raise ValueError("Empty model")
         if len(result.bot_description) > 2000:
             raise ValueError("bot_description exceeds 2000 characters")
-        if result.webui_enabled and len(result.webui_token.strip()) < 16:
-            raise ValueError("webui_token requires at least 16 characters")
-        if result.webui_host not in ("127.0.0.1", "::1"):
-            raise ValueError("WebUI must bind to a loopback address")
         return result

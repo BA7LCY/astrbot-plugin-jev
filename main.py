@@ -5,7 +5,6 @@ import json
 from pathlib import Path
 
 import aiohttp
-from aiohttp import web
 from astrbot.api import AstrBotConfig
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star
@@ -17,7 +16,9 @@ from .jev.config import Settings
 from .jev.engine import Engine
 from .jev.history import History
 from .jev.policy import Policy
-from .jev.web import create_app
+from .jev.web import build_handlers
+
+PLUGIN_NAME = "astrbot_plugin_jev"
 
 
 class JevPlugin(Star):
@@ -25,7 +26,7 @@ class JevPlugin(Star):
         super().__init__(context)
         self.settings = Settings.load(dict(config))
         self.session = None
-        self.runner = None
+        self.engine_slot: dict[str, Engine | None] = {"engine": None}
         self.adapter = None
 
     async def initialize(self):
@@ -49,12 +50,16 @@ class JevPlugin(Star):
                     json.loads(policy_path.read_text(encoding="utf-8"))
                 )
             self.adapter = AstrBotAdapter(engine, self.context)
-            if cfg.webui_enabled:
-                self.runner = web.AppRunner(
-                    create_app(engine, policy_path), access_log=None
+            self.engine_slot["engine"] = engine
+            for endpoint, (handler, methods) in build_handlers(
+                self.engine_slot, policy_path
+            ).items():
+                self.context.register_web_api(
+                    f"/{PLUGIN_NAME}/{endpoint}",
+                    handler,
+                    methods,
+                    f"Jev {endpoint}",
                 )
-                await self.runner.setup()
-                await web.TCPSite(self.runner, cfg.webui_host, cfg.webui_port).start()
             IngressFilter.adapter = self.adapter
             self.logger.info("Jev plugin initialized")
         except Exception:
@@ -89,9 +94,8 @@ class JevPlugin(Star):
     async def terminate(self):
         if IngressFilter.adapter is self.adapter:
             IngressFilter.adapter = None
-        if self.runner:
-            await self.runner.cleanup()
-            self.runner = None
+        self.adapter = None
+        self.engine_slot["engine"] = None
         if self.session:
             await self.session.close()
             self.session = None
