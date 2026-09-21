@@ -141,13 +141,23 @@ def build_handlers(state: dict[str, Engine | None], policy_path: Path | None) ->
             (item for item in reversed(messages) if item.role == "user"), None
         )
         persona_text = message.persona if message else ""
+        if not draft.uses_persona:
+            note = "草稿模板未写 {{persona}}，人格不会进入请求。"
+        elif not persona_text:
+            note = (
+                "草稿引用了 {{persona}}，但该会话快照没有人格文本；"
+                "在群里发一条新消息后再预览即可看到真实取值。"
+            )
+        else:
+            note = "预览使用所选会话最近的已解析快照；真实判断时重新读取当前人格。"
         return json_response(
             {
                 "pre": draft.render("pre", persona_text),
                 "post": draft.render("post", persona_text),
                 "persona_id": message.persona_id if message else "",
                 "persona_status": message.persona_status if message else "no_session",
-                "note": "预览使用所选会话最近的已解析快照；真实判断时重新读取当前人格。",
+                "persona_chars": len(persona_text),
+                "note": note,
             }
         )
 

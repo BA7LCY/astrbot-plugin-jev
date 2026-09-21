@@ -28,7 +28,11 @@ POST_PROMPT = """判断 state.candidate_reply 是否仍适合现在发送，而�
 class Policy:
     pre_prompt: str = PRE_PROMPT
     post_prompt: str = POST_PROMPT
-    include_persona: bool = False
+
+    @property
+    def uses_persona(self) -> bool:
+        """模板是否写了 {{persona}}，决定要不要向宿主解析人格。"""
+        return "{{persona}}" in self.pre_prompt or "{{persona}}" in self.post_prompt
 
     @classmethod
     def parse(cls, values: dict) -> "Policy":
@@ -46,11 +50,8 @@ class Policy:
         if not isinstance(values, dict) or set(values) != {
             "pre_prompt",
             "post_prompt",
-            "include_persona",
         }:
-            raise ValueError("模板字段必须为 pre_prompt、post_prompt、include_persona")
-        if type(values["include_persona"]) is not bool:
-            raise ValueError("人格开关必须为布尔值")
+            raise ValueError("模板字段必须为 pre_prompt、post_prompt")
         for name in ("pre_prompt", "post_prompt"):
             text = values[name]
             if not isinstance(text, str) or not 1 <= len(text.strip()) <= 6000:
@@ -58,8 +59,6 @@ class Policy:
             unknown = set(re.findall(r"\{\{(.*?)\}\}", text)) - {"persona"}
             if unknown:
                 raise ValueError("仅支持 {{persona}} 变量")
-            if text.count("{{persona}}") > 1:
-                raise ValueError("{{persona}} 在一个模板中最多插入一次")
         return cls(**values)
 
     def render(self, stage: str, persona: str) -> str:
@@ -73,7 +72,7 @@ class Policy:
             该次判断的最终指令。
         """
         template = self.pre_prompt if stage in ("pre", "probe") else self.post_prompt
-        return template.replace("{{persona}}", persona if self.include_persona else "")
+        return template.replace("{{persona}}", persona)
 
     def save(self, path: Path) -> None:
         """原子保存模板，并保留上一份配置备份。

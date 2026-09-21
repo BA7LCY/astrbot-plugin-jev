@@ -33,7 +33,7 @@ class Message:
     role: str = "user"
     persona: str = ""
     persona_id: str = ""
-    persona_status: str = "disabled"
+    persona_status: str = "unresolved"
 
 
 class Engine:
@@ -116,8 +116,6 @@ class Engine:
         policy = self.policy
         target = asdict(message)
         target.pop("persona")
-        if not policy.include_persona:
-            target.update(persona_id="", persona_status="disabled")
         conversation = []
         remaining = 12000
         for item in reversed(self.contexts.get(message.session, ())):
@@ -147,7 +145,6 @@ class Engine:
             "allowed": True,
             "reason": "disabled",
             "instructions": policy.render(stage, message.persona),
-            "include_persona": policy.include_persona,
         }
         start = time.monotonic()
         if cfg.recall_enabled and message.recalled:
@@ -158,8 +155,6 @@ class Engine:
             cfg.pre_check_enabled if stage == "pre" else cfg.post_check_enabled
         ):
             try:
-                if policy.include_persona and message.persona_status == "unavailable":
-                    raise JevError("persona_unavailable")
                 result = await self.judge.evaluate(state, stage, record["instructions"])
                 record.update(result)
                 record.update(

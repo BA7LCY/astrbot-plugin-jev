@@ -20,15 +20,11 @@ function notice(text, error = false) {
   $("notice").classList.toggle("error", error);
 }
 function draft() {
-  return {
-    pre_prompt: $("pre-prompt").value, post_prompt: $("post-prompt").value,
-    include_persona: $("include-persona").checked,
-  };
+  return { pre_prompt: $("pre-prompt").value, post_prompt: $("post-prompt").value };
 }
 function fill(policy) {
   $("pre-prompt").value = policy.pre_prompt;
   $("post-prompt").value = policy.post_prompt;
-  $("include-persona").checked = policy.include_persona;
 }
 async function status() {
   const data = await bridge.apiGet("status");
@@ -87,7 +83,7 @@ document.querySelectorAll(".insert").forEach((button) => {
     const editor = $(button.dataset.target);
     if (editor.value.includes("{{persona}}")) { notice("这个模板已有 {{persona}}，无需重复插入。"); return; }
     editor.setRangeText("{{persona}}", editor.selectionStart, editor.selectionEnd, "end");
-    editor.focus(); notice("已插入变量；如需传入人格，请勾选上方开关。");
+    editor.focus(); notice("已插入 {{persona}}；保存后该模板会带上当前会话人格。");
   };
 });
 $("save-policy").onclick = () => action($("save-policy"), async () => {
@@ -96,7 +92,7 @@ $("save-policy").onclick = () => action($("save-policy"), async () => {
 $("reset-policy").onclick = () => { if (defaults) fill(defaults); notice("已填入默认模板，尚未保存。"); };
 $("preview").onclick = () => action($("preview"), async () => {
   const data = await bridge.apiPost("preview", { policy: draft(), session: $("preview-session").value });
-  $("preview-note").textContent = `${data.note} 人格状态：${data.persona_status} ${data.persona_id}`;
+  $("preview-note").textContent = `${data.note} 人格状态：${data.persona_status} ${data.persona_id} / ${data.persona_chars} 字符`;
   $("preview-output").textContent = `【接话判断】\n${data.pre}\n\n【发送复核】\n${data.post}`;
 });
 $("probe").onclick = () => action($("probe"), async () => {

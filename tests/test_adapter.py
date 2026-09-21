@@ -139,12 +139,9 @@ async def test_registered_commands_bypass(adapter):
     assert msg.get_extra("enable_streaming") is True
 
 
-async def test_persona_resolves_session_selection(adapter):
+def persona_context(resolver):
     conversation = SimpleNamespace(persona_id="conversation-persona")
-    resolver = AsyncMock(
-        return_value=("forced-persona", {"prompt": "这是会话指定人格"}, None, False)
-    )
-    adapter.context = SimpleNamespace(
+    return SimpleNamespace(
         conversation_manager=SimpleNamespace(
             get_curr_conversation_id=AsyncMock(return_value="conversation-id"),
             get_conversation=AsyncMock(return_value=conversation),
@@ -154,7 +151,13 @@ async def test_persona_resolves_session_selection(adapter):
             "provider_settings": {"default_personality": "default"}
         },
     )
-    adapter.engine.policy = Policy(include_persona=True)
+
+
+async def test_persona_resolves_session_selection(adapter):
+    resolver = AsyncMock(
+        return_value=("forced-persona", {"prompt": "这是会话指定人格"}, None, False)
+    )
+    adapter.context = persona_context(resolver)
     msg = event()
     await adapter.receive(msg)
     captured = msg.get_extra("jev_message")
@@ -166,13 +169,23 @@ async def test_persona_resolves_session_selection(adapter):
     assert resolver.call_args.kwargs["umo"] == msg.unified_msg_origin
 
 
-async def test_missing_persona_resolver_fails_closed(adapter):
-    adapter.engine.policy = Policy(include_persona=True)
+async def test_template_without_persona_variable_skips_host(adapter):
+    resolver = AsyncMock()
+    adapter.context = persona_context(resolver)
+    adapter.engine.policy = Policy("沉默规则", "发送？")
     msg = event()
     await adapter.receive(msg)
-    assert msg.is_stopped()
-    assert not adapter.engine.judge.calls
-    assert adapter.engine.last_decision["reason"] == "judge_error"
+    resolver.assert_not_awaited()
+    assert msg.get_extra("jev_message").persona_status == "unresolved"
+
+
+async def test_unavailable_persona_degrades_without_blocking(adapter):
+    msg = event()
+    await adapter.receive(msg)
+    captured = msg.get_extra("jev_message")
+    assert captured.persona_status == "unavailable"
+    assert not msg.is_stopped()
+    assert adapter.engine.judge.calls
 
 
 async def test_plugin_lifecycle_without_real_credentials():

@@ -160,25 +160,38 @@ async def test_latest_context_is_used_for_post(setup_engine):
     assert judge.calls[-1][0]["conversation"][-1]["text"] == "不要回答了"
 
 
-async def test_persona_template_and_privacy(setup_engine):
+async def test_persona_follows_template(setup_engine):
     engine, judge, store = setup_engine()
-    msg = Message("g", "1", "u", "x", persona="秘密人格", persona_id="custom")
+    msg = Message(
+        "g",
+        "1",
+        "u",
+        "x",
+        persona="秘密人格",
+        persona_id="custom",
+        persona_status="resolved",
+    )
     engine.observe(msg)
-    await engine.decide("pre", msg)
+    engine.policy = Policy("沉默规则", "发送？")
+    assert await engine.decide("pre", msg)
+    assert "秘密人格" not in judge.calls[-1][2]
     assert "秘密人格" not in json.dumps(store.recent(), ensure_ascii=False)
-    engine.policy = Policy("规则：{{persona}}", "发送？", True)
-    await engine.decide("pre", msg)
+    engine.policy = Policy("规则：{{persona}}", "发送？")
+    assert await engine.decide("pre", msg)
     assert "秘密人格" in judge.calls[-1][2]
-    assert store.recent()[0]["include_persona"] is True
+    assert "persona" not in store.recent()[0]["state"]["target"]
     msg.persona_status = "unavailable"
-    assert not await engine.decide("post", msg)
-    assert store.recent()[0]["error"] == "persona_unavailable"
+    assert await engine.decide("post", msg, "answer")
+    assert store.recent()[0]["reason"] == "threshold"
 
 
 def test_policy_validation_and_atomic_persistence(tmp_path):
-    p = Policy("设定：{{persona}} / 结尾", "发送？", True)
+    p = Policy("设定：{{persona}} / 结尾", "发送？")
     assert p.render("pre", "{{persona}}") == "设定：{{persona}} / 结尾"
-    assert Policy("设定：{{persona}}", "发送？").render("pre", "人格") == "设定："
+    assert p.render("post", "人格") == "发送？"
+    assert Policy("设定：{{persona}}", "发送？").render("pre", "人格") == "设定：人格"
+    assert Policy("设定：{{persona}}", "发送？").uses_persona is True
+    assert Policy("设定", "发送？").uses_persona is False
     path = tmp_path / "policy.json"
     p.save(path)
     Policy().save(path)
@@ -186,11 +199,11 @@ def test_policy_validation_and_atomic_persistence(tmp_path):
     assert json.loads(
         path.with_suffix(".json.bak").read_text(encoding="utf-8")
     ) == asdict(p)
+    assert Policy.parse({**asdict(p), "pre_prompt": "{{persona}} 和 {{persona}}"})
     for data in [
         {**asdict(p), "pre_prompt": "{{unknown}}"},
         {**asdict(p), "pre_prompt": "{{bot_description}}"},
-        {**asdict(p), "pre_prompt": "{{persona}}{{persona}}"},
-        {**asdict(p), "include_persona": "false"},
+        {**asdict(p), "include_persona": True},
         {**asdict(p), "pre_prompt": ""},
     ]:
         with pytest.raises(ValueError):

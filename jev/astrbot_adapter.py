@@ -110,7 +110,7 @@ class AstrBotAdapter:
         )
         self.engine.observe(message)
         event.set_extra("jev_message", message)
-        if self.engine.policy.include_persona:
+        if self.engine.policy.uses_persona:
             await self.resolve_persona(event, message)
         allowed = await self.engine.decide("pre", message)
         event.set_extra("jev_pre_allowed", allowed)
@@ -161,7 +161,7 @@ class AstrBotAdapter:
             return
         if not self.engine.active(message.private):
             return
-        if self.engine.policy.include_persona:
+        if self.engine.policy.uses_persona:
             await self.resolve_persona(event, message)
         if not await self.engine.decide("final", message):
             event.stop_event()
@@ -186,7 +186,7 @@ class AstrBotAdapter:
             return
         if not self.engine.active(message.private):
             return
-        if self.engine.policy.include_persona:
+        if self.engine.policy.uses_persona:
             await self.resolve_persona(event, message)
         candidate = event.get_extra("jev_candidate")
         if candidate is None:

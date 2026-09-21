@@ -172,7 +172,7 @@ async def test_status_reports_state_and_never_leaks_secrets(console):
 
 
 POLICY_BODY = {"preview"}
-VALID = asdict(Policy("前 {{persona}}", "后 {{persona}}", True))
+VALID = asdict(Policy("前 {{persona}}", "后 {{persona}}"))
 
 
 async def test_every_endpoint_reports_unready_without_engine(console):
@@ -186,11 +186,9 @@ async def test_every_endpoint_reports_unready_without_engine(console):
 
 async def test_policy_roundtrip_validation_and_missing_store(console):
     handlers, engine, _ = console
-    assert (await call(handlers["policy"][0]))[1]["defaults"][
-        "include_persona"
-    ] is False
+    assert (await call(handlers["policy"][0]))[1]["defaults"] == asdict(Policy())
     status, saved = await call(handlers["policy/save"][0], "POST", None, VALID)
-    assert status == 200 and engine.policy.include_persona
+    assert status == 200 and engine.policy.uses_persona
     assert saved["policy"] == VALID
     status, _ = await call(
         handlers["policy/save"][0], "POST", None, {**VALID, "pre_prompt": "{{bad}}"}
@@ -215,7 +213,18 @@ async def test_preview_uses_resolved_persona_snapshot_without_deciding(console):
     assert data["pre"] == "前 会话人格"
     assert data["post"] == "后 会话人格"
     assert data["persona_status"] == "resolved"
+    assert data["persona_chars"] == len("会话人格")
     assert engine.decisions == 0
+    plain = asdict(Policy("前", "后"))
+    _, unused = await call(
+        handlers["preview"][0], "POST", None, {"policy": plain, "session": "g"}
+    )
+    assert unused["pre"] == "前" and "未写 {{persona}}" in unused["note"]
+    _, snapshotless = await call(
+        handlers["preview"][0], "POST", None, {"policy": VALID, "session": "other"}
+    )
+    assert snapshotless["persona_chars"] == 0
+    assert "没有人格文本" in snapshotless["note"]
     assert (await call(handlers["preview"][0], "POST", None, {"policy": VALID}))[
         0
     ] == 200
