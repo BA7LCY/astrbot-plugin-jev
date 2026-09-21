@@ -5,22 +5,19 @@ import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-PRE_PROMPT = """你在决定聊天机器人是否应该接话，而不是生成回复。
+PRE_PROMPT = """state.conversation 是本会话近期消息（按时间从早到晚），state.target 是当前这条消息。
+
+你在决定聊天机器人此刻要不要说话，而不是生成回复。
+
 机器人设定：{{persona}}
 
-根据 state.target 和 state.conversation 判断现在接话是否自然、必要：
-- 用户明确向机器人提问、求助或接续机器人的话题时，倾向接话。
-- 群友在互相聊天、重复刷屏、无关闲聊时，倾向沉默。
-- 不要为了体现存在感而插话；尊重用户让机器人停止回复的要求。
-- 私聊中可更积极，但仍需判断消息是否需要回应。
-是否应该接话？"""
+要不要接话？"""
 
-POST_PROMPT = """判断 state.candidate_reply 是否仍适合现在发送，而不是生成新回复。
+POST_PROMPT = """state.conversation 是本会话近期消息（按时间从早到晚），state.target 是触发回复的原消息，state.candidate_reply 是机器人准备发送的候选回复。
 
-结合原消息 state.target 和最新 state.conversation：
-- 用户已取消问题、话题已过时、回复重复或明显不相关时，不要发送。
-- 回复符合当前对话需要，并且没有打断他人时，可以发送。
-是否应该发送这条候选回复？"""
+机器人设定：{{persona}}
+
+这条候选回复现在还要不要发出去？"""
 
 
 @dataclass(frozen=True)
