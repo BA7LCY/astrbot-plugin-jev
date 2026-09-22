@@ -124,13 +124,15 @@ async def test_recall_during_audit_write(setup_engine):
     assert engine.last_decision["reason"] == "recalled"
 
 
-def test_context_bounds_and_inflight_recall(setup_engine):
-    engine, _, _ = setup_engine(max_sessions=1, context_messages=1, text_limit=100)
+def test_snapshot_bounds_and_inflight_recall(setup_engine):
+    engine, _, _ = setup_engine(text_limit=100)
     msg = Message("g", "1", "u", "x" * 200)
     engine.observe(msg)
-    engine.observe(Message("other", "2", "u", "new"))
-    assert list(engine.contexts) == ["other"]
     assert len(msg.text) == 100
+    for number in range(129):
+        engine.observe(Message(f"s{number}", str(number), "u", "n"))
+    assert len(engine.personas) == 128
+    assert "g" not in engine.personas
     engine.recall("g", "1")
     assert msg.recalled
     engine.recall("early", "3")
@@ -139,23 +141,31 @@ def test_context_bounds_and_inflight_recall(setup_engine):
     assert later.recalled
 
 
-async def test_context_and_history_disabled(setup_engine):
-    engine, judge, store = setup_engine(context_enabled=False, history_enabled=False)
-    msg = Message("g", "1", "u", "x")
-    engine.observe(msg)
-    await engine.decide("pre", msg)
-    assert not engine.contexts and not store.recent()
-    assert judge.calls[0][0]["conversation"] == []
+async def test_history_disabled_still_judges(setup_engine):
+    engine, judge, store = setup_engine(history_enabled=False)
+    msg = Message("g", "1", "u", "x", conversation=["[小明/13:05]:  在吗"])
+    assert await engine.decide("pre", msg)
+    assert not store.recent()
+    assert judge.calls[0][0]["conversation"] == ["[小明/13:05]:  在吗"]
 
 
-async def test_latest_context_is_used_for_post(setup_engine):
+async def test_own_reply_is_prepended_only_for_groups(setup_engine):
     engine, judge, _ = setup_engine()
-    msg = Message("g", "1", "u", "question")
+    msg = Message("g", "1", "u", "question", conversation=["[小明/13:05]:  在吗"])
     engine.observe(msg)
     await engine.decide("pre", msg)
-    engine.observe(Message("g", "2", "u", "不要回答了"))
+    assert judge.calls[-1][0]["conversation"] == ["[小明/13:05]:  在吗"]
+    engine.observe(Message("g", "bot:1", "bot", "在的", role="assistant"))
     await engine.decide("post", msg, "answer")
-    assert judge.calls[-1][0]["conversation"][-1] == "成员1：不要回答了"
+    assert judge.calls[-1][0]["conversation"] == [
+        "机器人：在的",
+        "[小明/13:05]:  在吗",
+    ]
+    engine.settings = replace(engine.settings, private_enabled=True)
+    await engine.decide(
+        "pre", Message("p", "2", "u", "x", private=True, conversation=["对方：在吗"])
+    )
+    assert judge.calls[-1][0]["conversation"] == ["对方：在吗"]
 
 
 async def test_persona_follows_template(setup_engine):
@@ -245,7 +255,7 @@ def test_history_retention_and_pagination(tmp_path):
     [
         {"threshold": float("nan")},
         {"enabled": "false"},
-        {"context_messages": 0},
+        {"history_limit": 0},
         {"text_limit": 50},
         {"timeout_seconds": "8"},
         {"model": "   "},
@@ -280,11 +290,10 @@ async def test_storage_failure_does_not_break_gate(setup_engine):
 
 
 async def test_context_total_budget(setup_engine):
-    engine, judge, _ = setup_engine(text_limit=4000, context_messages=50)
-    for number in range(20):
-        engine.observe(Message("g", str(number), "u", "x" * 4000))
-    await engine.decide("pre", Message("g", "target", "u", "x"))
+    engine, judge, _ = setup_engine()
+    lines = [f"[{n}] " + "x" * 3995 for n in range(20)]
+    msg = Message("g", "target", "u", "x", conversation=lines)
+    await engine.decide("pre", msg)
     context = judge.calls[0][0]["conversation"]
-    assert sum(len(line) for line in context) <= 12000 + 3 * len("成员1：")
-    assert context[-1] == "成员1：" + "x" * 4000
-    assert len(context) == 3
+    assert context == lines[-3:]
+    assert sum(len(line) for line in context) == 12000

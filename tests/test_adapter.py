@@ -1,3 +1,5 @@
+import json
+from collections import deque
 from dataclasses import replace
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -64,8 +66,7 @@ async def test_wake_and_send_flow(adapter):
     await msg.send(msg.get_result())
     adapter.after_sent(msg)
     assert len(msg.sent) == 1
-    context = adapter.engine.contexts[adapter.session_key(msg)]
-    assert context[-1].role == "assistant"
+    assert adapter.engine.last_replies[adapter.session_key(msg)] == "机器人：response"
     assert [call[1] for call in adapter.engine.judge.calls] == ["pre", "post"]
 
 
@@ -95,7 +96,7 @@ async def test_recall_after_decoration_guard(adapter):
     adapter.after_sent(msg)
     assert not msg.sent
     assert msg.get_extra("jev_delivery_blocked")
-    assert len(adapter.engine.contexts[adapter.session_key(msg)]) == 1
+    assert not adapter.engine.last_replies
 
 
 async def test_recall_while_waiting_for_llm(adapter):
@@ -139,6 +140,56 @@ async def test_rejection_only_blocks_default_llm_chain(adapter):
     await adapter.before_llm(msg)
     assert not msg.get_extra("jev_generation")
     assert len(adapter.engine.judge.calls) == 1
+
+
+def host_context(records=None, history=None):
+    return SimpleNamespace(
+        get_registered_star=lambda name: SimpleNamespace(
+            star_cls=SimpleNamespace(
+                group_chat_context=SimpleNamespace(raw_records=records or {})
+            )
+        ),
+        conversation_manager=SimpleNamespace(
+            get_curr_conversation_id=AsyncMock(return_value="cid"),
+            get_conversation=AsyncMock(
+                return_value=SimpleNamespace(history=json.dumps(history or []))
+            ),
+        ),
+    )
+
+
+async def test_group_context_copied_from_host_deque(adapter):
+    msg = event()
+    adapter.context = host_context(
+        {msg.unified_msg_origin: deque(["[小明/13:05]:  在吗"])}
+    )
+    await adapter.receive(msg)
+    state = adapter.engine.judge.calls[0][0]
+    assert state["conversation"] == ["[小明/13:05]:  在吗"]
+    assert state["target"].startswith("用户：")
+
+
+async def test_group_context_stays_empty_without_host_records(adapter):
+    msg = event()
+    adapter.context = host_context()
+    await adapter.receive(msg)
+    assert adapter.engine.judge.calls[0][0]["conversation"] == []
+
+
+async def test_private_context_copied_from_conversation_history(adapter):
+    adapter.engine.settings = replace(adapter.engine.settings, private_enabled=True)
+    adapter.context = host_context(
+        history=[
+            {"role": "system", "content": "跳过"},
+            {"role": "user", "content": [{"type": "text", "text": "在吗"}]},
+            {"role": "assistant", "content": "在的"},
+        ]
+    )
+    await adapter.receive(event(private=True))
+    assert adapter.engine.judge.calls[0][0]["conversation"] == [
+        "对方：在吗",
+        "机器人：在的",
+    ]
 
 
 def host_config(platform=None, active=None, broken=False):

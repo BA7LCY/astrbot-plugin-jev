@@ -41,12 +41,6 @@
     "default": true,
     "hint": "上下文、候选回复和模板明文保存在本地 SQLite，关闭不删除已有记录。"
   },
-  "context_enabled": {
-    "description": "收集近期上下文",
-    "type": "bool",
-    "default": true,
-    "hint": "关闭后仅判断当前消息和候选回复。"
-  },
   "bypass_commands": {
     "description": "插件命令旁路",
     "type": "bool",
@@ -82,18 +76,6 @@
     "type": "float",
     "default": 0.5,
     "hint": "0～1，Noul 概率大于等于此值才放行。线上实测：接话阶段该接 0.76～0.79、该沉默 0.20～0.44；复核阶段该发 0.45～0.70、不该发 0.06～0.08。同一请求跨小时重测会漂移 0.1～0.2，复核阶段尤其贴近阈值。"
-  },
-  "context_messages": {
-    "description": "每会话上下文条数",
-    "type": "int",
-    "default": 20,
-    "hint": "1～50，额外受 12000 字符总预算限制。"
-  },
-  "max_sessions": {
-    "description": "最多缓存会话数",
-    "type": "int",
-    "default": 128,
-    "hint": "1～1000，超出时淘汰最久未使用会话。"
   },
   "text_limit": {
     "description": "单条文本字符上限",

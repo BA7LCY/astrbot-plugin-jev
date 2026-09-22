@@ -67,19 +67,8 @@ def build_handlers(state: dict[str, Engine | None], policy_path: Path | None) ->
                 "recall_support": "OneBot v11 group_recall / friend_recall",
                 "scope": "AstrBot pipeline replies; direct tool/plugin sends excluded",
                 "sessions": [
-                    {
-                        "id": key,
-                        "persona_id": next(
-                            (
-                                item.persona_id
-                                for item in reversed(items)
-                                if item.role == "user"
-                            ),
-                            "",
-                        ),
-                    }
-                    for key, items in current.contexts.items()
-                    if items
+                    {"id": key, "persona_id": item.persona_id}
+                    for key, item in current.personas.items()
                 ],
             }
         )
@@ -136,11 +125,8 @@ def build_handlers(state: dict[str, Engine | None], policy_path: Path | None) ->
                 raise ValueError
         except (ValueError, KeyError, TypeError):
             return error_response("预览参数不合法", status_code=400)
-        messages = current.contexts.get(session_id, ())
-        message = next(
-            (item for item in reversed(messages) if item.role == "user"), None
-        )
-        persona_text = message.persona if message else ""
+        snapshot = current.personas.get(session_id)
+        persona_text = snapshot.persona if snapshot else ""
         if not draft.uses_persona:
             note = "草稿模板未写 {{persona}}，人格不会进入请求。"
         elif not persona_text:
@@ -154,8 +140,8 @@ def build_handlers(state: dict[str, Engine | None], policy_path: Path | None) ->
             {
                 "pre": draft.render("pre", persona_text),
                 "post": draft.render("post", persona_text),
-                "persona_id": message.persona_id if message else "",
-                "persona_status": message.persona_status if message else "no_session",
+                "persona_id": snapshot.persona_id if snapshot else "",
+                "persona_status": snapshot.persona_status if snapshot else "no_session",
                 "persona_chars": len(persona_text),
                 "note": note,
             }

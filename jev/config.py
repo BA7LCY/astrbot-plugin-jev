@@ -13,15 +13,12 @@ class Settings:
     post_check_enabled: bool = True
     recall_enabled: bool = True
     history_enabled: bool = True
-    context_enabled: bool = True
     bypass_commands: bool = True
     fail_open: bool = False
     api_key: str = ""
     model: str = "jev-latest"
     timeout_seconds: float = 8.0
     threshold: float = 0.5
-    context_messages: int = 20
-    max_sessions: int = 128
     text_limit: int = 2000
     history_limit: int = 1000
 
@@ -58,8 +55,6 @@ class Settings:
         ranges = {
             "timeout_seconds": (0.1, 60),
             "threshold": (0, 1),
-            "context_messages": (1, 50),
-            "max_sessions": (1, 1000),
             "text_limit": (100, 4000),
             "history_limit": (1, 10000),
         }

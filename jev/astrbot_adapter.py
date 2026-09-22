@@ -11,6 +11,26 @@ from astrbot.core.star.filter.command_group import CommandGroupFilter
 from .engine import Engine, Message
 
 
+def plain_text(content) -> str:
+    """把宿主对话历史的 content 压成一行文本，忽略图片等非文本段。
+
+    Args:
+        content: OpenAI 消息的 content，字符串或段列表。
+
+    Returns:
+        去空白后的纯文本，没有文本时为空串。
+    """
+    if isinstance(content, str):
+        return content.strip()
+    if isinstance(content, list):
+        return " ".join(
+            part["text"].strip()
+            for part in content
+            if isinstance(part, dict) and isinstance(part.get("text"), str)
+        ).strip()
+    return ""
+
+
 class IngressFilter(filter.CustomFilter):
     adapter = None
 
@@ -141,6 +161,51 @@ class AstrBotAdapter:
         """
         event.set_extra("enable_streaming", event.get_extra("jev_original_streaming"))
 
+    def host_group_lines(self, event) -> list[str]:
+        """复制宿主内置群聊上下文里尚未注入的那几行，完全跟随其状态。
+
+        Args:
+            event: 消息事件。
+
+        Returns:
+            宿主原样格式化好的群聊行；宿主没开群聊上下文或读不到时为空。
+        """
+        try:
+            star = self.context.get_registered_star("astrbot")
+            records = star.star_cls.group_chat_context.raw_records
+            return list(records.get(event.unified_msg_origin) or ())
+        except Exception:
+            return []
+
+    async def host_history_lines(self, event) -> list[str]:
+        """复制当前会话已持久化的 LLM 对话历史，含机器人自己的回复。
+
+        Args:
+            event: 消息事件。
+
+        Returns:
+            按时间正序的「对方／机器人：文本」行；没有会话或读不到时为空。
+        """
+        try:
+            manager = self.context.conversation_manager
+            umo = event.unified_msg_origin
+            cid = await manager.get_curr_conversation_id(umo)
+            if not cid:
+                return []
+            conversation = await manager.get_conversation(umo, cid)
+            history = json.loads(conversation.history or "[]") if conversation else []
+        except Exception:
+            return []
+        lines = []
+        for item in history:
+            role = item.get("role") if isinstance(item, dict) else None
+            text = (
+                plain_text(item.get("content")) if role in ("user", "assistant") else ""
+            )
+            if text:
+                lines.append(f"{'机器人' if role == 'assistant' else '对方'}：{text}")
+        return lines
+
     async def receive(self, event) -> None:
         """接管普通聊天；已匹配的插件命令默认旁路。
 
@@ -159,18 +224,25 @@ class AstrBotAdapter:
                 event.set_extra("jev_bypass", True)
                 self.restore_streaming(event)
                 return
+        private = event.is_private_chat()
         message = Message(
             session=self.session_key(event),
             message_id=str(event.message_obj.message_id),
             sender=str(event.get_sender_id()),
             text=event.message_str,
-            private=event.is_private_chat(),
+            private=private,
             addressed=bool(event.is_at_or_wake_command),
+            speaker_name=""
+            if private
+            else str(event.message_obj.sender.nickname or ""),
+            conversation=await self.host_history_lines(event)
+            if private
+            else self.host_group_lines(event),
         )
-        self.engine.observe(message)
         event.set_extra("jev_message", message)
         if self.engine.policy.uses_persona:
             await self.resolve_persona(event, message)
+        self.engine.observe(message)
         allowed = await self.engine.decide("pre", message)
         event.set_extra("jev_pre_allowed", allowed)
         if not allowed:

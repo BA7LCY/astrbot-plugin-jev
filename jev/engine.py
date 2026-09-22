@@ -5,8 +5,8 @@ import logging
 import sqlite3
 import time
 import weakref
-from collections import OrderedDict, deque
-from dataclasses import dataclass, replace
+from collections import OrderedDict
+from dataclasses import dataclass, field
 from typing import Protocol
 
 from .client import JevError
@@ -15,6 +15,9 @@ from .history import History
 from .policy import Policy
 
 logger = logging.getLogger(__name__)
+
+MAX_SNAPSHOTS = 128
+CONVERSATION_BUDGET = 12000
 
 
 class Judge(Protocol):
@@ -34,25 +37,38 @@ class Message:
     persona: str = ""
     persona_id: str = ""
     persona_status: str = "unresolved"
+    speaker_name: str = ""
+    conversation: list[str] = field(default_factory=list)
 
 
 NON_TEXT = "（图片/表情等读不到的内容）"
 
 
+@dataclass(frozen=True)
+class PersonaSnapshot:
+    """控制台预览用的会话人格快照，不含从宿主复制的聊天行。"""
+
+    persona: str = ""
+    persona_id: str = ""
+    persona_status: str = "unresolved"
+
+
 def speaker(message: Message, names: dict[str, str]) -> str:
-    """为本次请求分配可读的说话人标签，平台 ID 不外发。
+    """为本次请求确定说话人标签，优先沿用宿主给出的昵称。
 
     Args:
         message: 待渲染的消息。
         names: 本次请求内「发送者 ID → 标签」映射，会被就地填充。
 
     Returns:
-        机器人 / 对方 / 成员N 形式的标签。
+        机器人 / 对方 / 宿主昵称 / 成员N 形式的标签。
     """
     if message.role == "assistant":
         return "机器人"
     if message.private:
         return "对方"
+    if message.speaker_name:
+        return message.speaker_name
     if message.sender not in names:
         names[message.sender] = f"成员{len(names) + 1}"
     return names[message.sender]
@@ -92,7 +108,8 @@ class Engine:
         self.settings = settings
         self.judge = judge
         self.history = history
-        self.contexts: OrderedDict[str, deque] = OrderedDict()
+        self.personas: OrderedDict[str, PersonaSnapshot] = OrderedDict()
+        self.last_replies: OrderedDict[str, str] = OrderedDict()
         self.tombstones: OrderedDict[tuple[str, str], float] = OrderedDict()
         self.live: weakref.WeakValueDictionary = weakref.WeakValueDictionary()
         self.last_decision: dict | None = None
@@ -106,27 +123,42 @@ class Engine:
             self.settings.private_enabled if private else self.settings.group_enabled
         )
 
-    def observe(self, message: Message) -> None:
-        """记录受管消息；有界上下文与在途消息分别管理。
+    @staticmethod
+    def remember(store: OrderedDict, key: str, value) -> None:
+        """按最近使用保留有限条快照。
 
         Args:
-            message: 兼容层产生的消息。
+            store: 以会话键索引的有序字典。
+            key: 会话键。
+            value: 快照内容。
+        """
+        store[key] = value
+        store.move_to_end(key)
+        while len(store) > MAX_SNAPSHOTS:
+            store.popitem(last=False)
+
+    def observe(self, message: Message) -> None:
+        """登记在途消息、会话人格快照和机器人自己发出的那行。
+
+        Args:
+            message: 兼容层在解析完人格后产生的消息；聊天上下文由兼容层从宿主复制，
+                引擎不留副本。
         """
         message.text = message.text[: self.settings.text_limit]
         key = (message.session, message.message_id)
         if key in self.tombstones:
             message.recalled = True
         self.live[key] = message
-        if not self.settings.context_enabled:
-            return
-        context = self.contexts.setdefault(
-            message.session, deque(maxlen=self.settings.context_messages)
-        )
-        if not any(item.message_id == message.message_id for item in context):
-            context.append(message)
-        self.contexts.move_to_end(message.session)
-        while len(self.contexts) > self.settings.max_sessions:
-            self.contexts.popitem(last=False)
+        if message.role == "assistant":
+            self.remember(self.last_replies, message.session, render_line(message, {}))
+        else:
+            self.remember(
+                self.personas,
+                message.session,
+                PersonaSnapshot(
+                    message.persona, message.persona_id, message.persona_status
+                ),
+            )
 
     def recall(self, session: str, message_id: str) -> None:
         """同步标记撤回，避免被后续限流或异步处理阻塞。
@@ -146,16 +178,13 @@ class Engine:
             self.tombstones.pop(first)
         if message := self.live.get(key):
             message.recalled = True
-        for item in self.contexts.get(session, ()):
-            if item.message_id == message_id:
-                item.recalled = True
 
     async def decide(self, stage: str, message: Message, candidate: str = "") -> bool:
-        """以最新上下文判断，API 等待后再次检查硬性撤回规则。
+        """基于兼容层复制来的宿主上下文判断，API 等待后再次检查硬性撤回规则。
 
         Args:
             stage: pre、post、final 或 probe。
-            message: 原始触发消息。
+            message: 原始触发消息，其 conversation 由兼容层从宿主复制。
             candidate: 完整回复的有界文本。
 
         Returns:
@@ -165,16 +194,22 @@ class Engine:
         if stage != "probe" and not self.active(message.private):
             return True
         policy = self.policy
-        pending = []
-        remaining = 12000
-        for item in reversed(self.contexts.get(message.session, ())):
+        lines = list(message.conversation)
+        previous = (
+            self.last_replies.get(message.session) if not message.private else None
+        )
+        if previous:
+            lines.insert(0, previous)
+        picked = []
+        remaining = CONVERSATION_BUDGET
+        for line in reversed(lines):
             if remaining <= 0:
                 break
-            item_text = item.text[:remaining]
-            remaining -= len(item_text)
-            pending.append(replace(item, text=item_text))
+            cut = line[:remaining]
+            remaining -= len(cut)
+            picked.append(cut)
+        conversation = list(reversed(picked))
         names: dict[str, str] = {}
-        conversation = [render_line(item, names) for item in reversed(pending)]
         state = {
             "target": f"{render_line(message, names)}〔{render_scene(message)}〕",
             "conversation": conversation,
