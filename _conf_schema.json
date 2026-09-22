@@ -1,98 +1,98 @@
 {
   "enabled": {
-    "description": "启用 Jev 插件",
+    "description": "总开关",
     "type": "bool",
     "default": false,
-    "hint": "默认关闭。配置 API 密钥后启用；聊天上下文会发送给 TypeSafe。"
+    "hint": "关掉时本插件完全不管聊天，所有消息照 AstrBot 原来的方式处理。开启前先把下面的接口密钥填好，否则每次判断都会失败。注意这个开关本身还不接管任何聊天，要再打开群聊接管或私聊接管。"
   },
   "group_enabled": {
-    "description": "群聊接管",
+    "description": "接管群聊",
     "type": "bool",
     "default": false,
-    "hint": "默认关闭，关闭时群聊保持宿主原行为。开启后仍须通过宿主会话白名单和主动回复白名单。"
+    "hint": "开启后，群里没有 @ 机器人的普通发言也会先问一句该不该接，接了才回。默认关闭，关闭时群聊完全按 AstrBot 原来的规则处理。只会接管 AstrBot 会话白名单和主动回复白名单里的群，名单外的群不接管、也不发送任何内容。"
   },
   "private_enabled": {
-    "description": "私聊接管",
+    "description": "接管私聊",
     "type": "bool",
     "default": false,
-    "hint": "默认关闭，关闭时私聊保持宿主原行为。开启后仍须通过宿主会话白名单。"
+    "hint": "开启后，私聊的普通消息也会先判断该不该回。默认关闭，关闭时私聊保持 AstrBot 原来的处理。同样要先在 AstrBot 会话白名单里放行这个会话。"
   },
   "pre_check_enabled": {
-    "description": "接话前判断",
+    "description": "接话前先判断",
     "type": "bool",
     "default": true,
-    "hint": "开启后会判断普通群聊是否值得主动接话；关闭时保持宿主唤醒规则。"
+    "hint": "第一道判断：先看这句值不值得接。判定通过才让语言模型去生成回复，不通过这条就不回。关掉后不做这道判断，要不要回完全交给 AstrBot 原来的唤醒规则（被 @、关键词等）。"
   },
   "post_check_enabled": {
-    "description": "生成后发送复核",
+    "description": "发送前再复核",
     "type": "bool",
     "default": true,
-    "hint": "启用时受管回复关闭流式输出，完整生成后再判断。"
+    "hint": "第二道判断：回复写完之后再看这句该不该发出去，用来拦住接错话、说多余话。开启后被接管的这条消息不能逐字流式输出，要等整段生成完再决定发不发，所以回复出现会比平时慢一点。"
   },
   "recall_enabled": {
-    "description": "撤回硬拦截",
+    "description": "原消息撤回后不再回复",
     "type": "bool",
     "default": true,
-    "hint": "OneBot v11 撤回通知；独立于 Jev 判断，开启时同样关闭流式输出。"
+    "hint": "对方撤回触发的那条消息后，还没发出去的回复会被丢掉。这是硬规则，就算选了判断失败时放行也不会绕过它。目前只有以 OneBot 协议接入的 QQ 能收到撤回通知，其他平台没有这项保护。"
   },
   "history_enabled": {
-    "description": "保存判断历史",
+    "description": "保存判断记录",
     "type": "bool",
     "default": true,
-    "hint": "上下文、候选回复和模板明文保存在本地 SQLite，关闭不删除已有记录。"
+    "hint": "在本地记下每次判断看到的聊天内容、候选回复、用的规则、概率和结果，控制台里的记录列表就是这些。记录以未加密的数据库文件存在插件数据目录里，含聊天原文，请保护好这台机器。关掉只会停止新增，不会删除已有记录。"
   },
   "bypass_commands": {
-    "description": "插件命令旁路",
+    "description": "指令跳过判断",
     "type": "bool",
     "default": true,
-    "hint": "已匹配的 AstrBot/插件命令不参与判断。"
+    "hint": "被 AstrBot 认成指令的消息（比如 /help、各插件自己的命令）直接跳过判断，照常执行。关掉后这些指令也会先过一遍判断，可能被误拦。"
   },
   "fail_open": {
-    "description": "Jev 故障时放行",
+    "description": "判断失败时是否放行",
     "type": "bool",
     "default": false,
-    "hint": "默认关闭。超时、缺密钥、429 等均拒绝；开启后可能增加打扰，不会绕过撤回硬规则。"
+    "hint": "默认不放行：接口超时、密钥不对、被限流时这条就不回了，宁可少说。改成放行则相反，宁可多发，打扰会变多。撤回那条硬规则不受这里影响。"
   },
   "api_key": {
-    "description": "Jev API Key",
+    "description": "接口密钥",
     "type": "string",
     "default": "",
-    "hint": "仅填写到这里，不要填到提示词模板。必须是下方「接口地址」那家服务商的密钥；协议是 systemone，不是 OpenAI 兼容接口。"
+    "hint": "填你要用的那一家给的密钥，只写在这一行，不要写进提示词模板。密钥要和下面的接口地址配套：官方地址配官方密钥，OpenRouter 配 OpenRouter 的密钥。留空时每次判断都会失败，并按判断失败时的设置处理。"
   },
   "api_base": {
-    "description": "接口地址（基址）",
+    "description": "接口地址",
     "type": "string",
     "default": "https://api.typesafe.ai",
-    "hint": "只填基址、不要带 /v1/systemone，末尾斜杠可省。默认官方 TypeSafe：https://api.typesafe.ai；OpenRouter：https://openrouter.ai/api；Vercel AI Gateway：https://ai-gateway.vercel.sh/typesafe。必须是 https 公网地址，含账号密码、查询串或指向内网/环回的都会被拒绝启动。换地址记得换 api_key 和 model。"
+    "hint": "只填地址本身，例如 https://api.typesafe.ai；请求路径 /v1/systemone 由插件自己补，末尾斜杠写不写都行。三家选一家：官方 https://api.typesafe.ai（默认）、OpenRouter https://openrouter.ai/api、Vercel AI Gateway https://ai-gateway.vercel.sh/typesafe。必须是 https 的公网地址；带账号密码、带问号参数、或写内网和本机地址（如 127.0.0.1、192.168.x.x）都会启动失败。换地址记得同时换密钥和模型名。"
   },
   "model": {
-    "description": "Jev 模型",
+    "description": "模型名",
     "type": "string",
     "default": "jev-latest",
-    "hint": "随接口地址取值：官方默认 jev-latest，也可固定官方版本 ID；OpenRouter 用 jev-latest 或 typesafe/jev-1.13；Vercel AI Gateway 用 typesafe-ai/jev。"
+    "hint": "三家的叫法不一样，别照抄。官方：jev-latest，也可填官方给的固定版本号。OpenRouter：jev-latest 或 typesafe/jev-1.13。Vercel AI Gateway：typesafe-ai/jev。填错会得到接口报错。"
   },
   "timeout_seconds": {
-    "description": "判断超时（秒）",
+    "description": "单次判断最多等几秒",
     "type": "float",
     "default": 8.0,
-    "hint": "0.1～60，包含最多四个并发请求的排队时间；不自动重试。"
+    "hint": "可填 0.1 到 60。这段时间已包含排队（最多四个判断同时在等），到点就算失败，不会自动重试。数值调大更不容易超时，但机器人接话的延迟也更明显。"
   },
   "threshold": {
-    "description": "放行概率阈值",
+    "description": "放行门槛（概率）",
     "type": "float",
     "default": 0.5,
-    "hint": "0～1，Noul 概率大于等于此值才放行。线上实测：接话阶段该接 0.76～0.79、该沉默 0.20～0.44；复核阶段该发 0.45～0.70、不该发 0.06～0.08。同一请求跨小时重测会漂移 0.1～0.2，复核阶段尤其贴近阈值。"
+    "hint": "接口对每条内容给一个该不该说的概率，可填 0 到 1，大于等于这个值才放行。参考真实案例的实测：该接的话多在 0.76 以上，不该接的多在 0.44 以下；发送复核这一关该发的多在 0.45 到 0.70，不该发的在 0.08 以下，所以两关共用 0.5 时，复核更容易误判。同一句隔半小时再问，概率可能漂 0.1 到 0.2，调完建议观察一阵记录。"
   },
   "text_limit": {
-    "description": "单条文本字符上限",
+    "description": "单条文本长度上限",
     "type": "int",
     "default": 2000,
-    "hint": "100～4000，超过会截断；Jev 不直接读取图片或音频。"
+    "hint": "可填 100 到 4000。一条消息或一条候选回复超过这个长度会被截断后再送去判断，判断可能不准。图片和语音不在这里处理，只有已经转成文字的内容才会送出。"
   },
   "history_limit": {
-    "description": "历史保留条数",
+    "description": "记录保留条数",
     "type": "int",
     "default": 1000,
-    "hint": "1～10000，保存新记录时清理旧记录。"
+    "hint": "可填 1 到 10000。超出后自动删掉最早的记录，只影响控制台能看到多少条历史，不影响聊天本身。"
   }
 }
