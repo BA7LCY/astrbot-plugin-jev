@@ -266,6 +266,41 @@ def test_config_validation(overrides):
         Settings.load(overrides)
 
 
+@pytest.mark.parametrize(
+    "base",
+    [
+        "http://api.typesafe.ai",
+        "https://127.0.0.1",
+        "https://192.168.3.74",
+        "https://[::1]",
+        "https://localhost",
+        "https://jev.internal",
+        "https://user:pass@api.typesafe.ai",
+        "https://api.typesafe.ai?key=leak",
+        "api.typesafe.ai",
+        "",
+    ],
+)
+def test_api_base_rejects_unsafe_endpoints(base):
+    with pytest.raises(ValueError):
+        Settings.load({"api_base": base})
+
+
+@pytest.mark.parametrize(
+    "base,cleaned",
+    [
+        ("https://api.typesafe.ai/", "https://api.typesafe.ai"),
+        ("  https://openrouter.ai/api  ", "https://openrouter.ai/api"),
+        (
+            "https://ai-gateway.vercel.sh/typesafe",
+            "https://ai-gateway.vercel.sh/typesafe",
+        ),
+    ],
+)
+def test_api_base_accepts_official_and_gateways(base, cleaned):
+    assert Settings.load({"api_base": base}).api_base == cleaned
+
+
 def test_config_schema_matches_defaults():
     from pathlib import Path
 

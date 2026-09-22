@@ -28,7 +28,7 @@ function fill(policy) {
 async function status() {
   const data = await bridge.apiGet("status");
   $("running").textContent = data.enabled ? "接话守卫已启用" : "旁路 · 总开关已关闭";
-  $("model").textContent = `${data.model} / 阈值 ${data.threshold} / ${data.api_configured ? "API 已配置" : "未配置 API 密钥"}`;
+  $("model").textContent = `${data.model} / 阈值 ${data.threshold} / 接口 ${data.api_base.replace(/^https:\/\//, "")} / ${data.api_configured ? "API 已配置" : "未配置 API 密钥"}`;
   $("decisions").textContent = data.decisions;
   $("blocked").textContent = data.blocked;
   $("storage").textContent = data.history_error ? "历史存储异常，请检查磁盘" : "历史存储无已知异常";

@@ -54,16 +54,22 @@
     "hint": "默认关闭。超时、缺密钥、429 等均拒绝；开启后可能增加打扰，不会绕过撤回硬规则。"
   },
   "api_key": {
-    "description": "TypeSafe API Key",
+    "description": "Jev API Key",
     "type": "string",
     "default": "",
-    "hint": "仅填写到这里，不要填到提示词模板。使用官方 systemone 接口，不是 OpenAI 兼容接口。"
+    "hint": "仅填写到这里，不要填到提示词模板。必须是下方「接口地址」那家服务商的密钥；协议是 systemone，不是 OpenAI 兼容接口。"
+  },
+  "api_base": {
+    "description": "接口地址（基址）",
+    "type": "string",
+    "default": "https://api.typesafe.ai",
+    "hint": "只填基址、不要带 /v1/systemone，末尾斜杠可省。默认官方 TypeSafe：https://api.typesafe.ai；OpenRouter：https://openrouter.ai/api；Vercel AI Gateway：https://ai-gateway.vercel.sh/typesafe。必须是 https 公网地址，含账号密码、查询串或指向内网/环回的都会被拒绝启动。换地址记得换 api_key 和 model。"
   },
   "model": {
     "description": "Jev 模型",
     "type": "string",
     "default": "jev-latest",
-    "hint": "默认 jev-latest，也可固定官方版本 ID。"
+    "hint": "随接口地址取值：官方默认 jev-latest，也可固定官方版本 ID；OpenRouter 用 jev-latest 或 typesafe/jev-1.13；Vercel AI Gateway 用 typesafe-ai/jev。"
   },
   "timeout_seconds": {
     "description": "判断超时（秒）",

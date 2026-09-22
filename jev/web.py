@@ -53,6 +53,7 @@ def build_handlers(state: dict[str, Engine | None], policy_path: Path | None) ->
             {
                 "enabled": cfg.enabled,
                 "api_configured": bool(cfg.api_key.strip()),
+                "api_base": cfg.api_base,
                 "model": cfg.model,
                 "threshold": cfg.threshold,
                 "switches": {

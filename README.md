@@ -5,11 +5,26 @@
 ## 安装与启用
 
 1. 将此目录放入 AstrBot 的 `data/plugins`，在插件管理中加载。当前针对 AstrBot **4.27.4** 验证，元数据限定 `<4.28.0`。
-2. 在插件配置填写 TypeSafe `api_key`。使用官方 `POST /v1/systemone`，不是 OpenAI 兼容接口；模型默认 `jev-latest`。
+2. 在插件配置填写 `api_key` 与 `api_base`。默认走官方 TypeSafe 的 `POST /v1/systemone`（不是 OpenAI 兼容接口），模型默认 `jev-latest`；换成网关只需改基址，见下方「接口入口」。
 3. 开启 `enabled`，再按需单独打开 `group_enabled`（群聊接管）和 `private_enabled`（私聊接管）。两者**默认关闭**，只开 `enabled` 不会改变任何聊天行为。开启后仍只接管通过宿主会话白名单与主动回复白名单的会话。
 4. 控制台无需额外开关或端口：重新加载插件后，在 AstrBot WebUI 的插件管理中进入本插件详情页，打开 **Jev 控制台** Page。新增或删除 `pages/` 下的目录需要重载插件才会被发现。
 
 已有 `aiohttp` 即可，无额外 SDK、前端构建或数据库服务。修改宿主插件配置后重新加载；Page 内模板保存后下一次判断立即生效。此仓库不修改宿主 dashboard/OpenAPI，因此不需要生成宿主 API client。
+
+## 接口入口
+
+三家都转发同一套 System One 协议，插件自己拼 `/v1/systemone`，所以 `api_base` **只填基址**（可带路径前缀，末尾斜杠可省）：
+
+| 入口 | `api_base` | `model` 示例 |
+| --- | --- | --- |
+| 官方 TypeSafe（默认） | `https://api.typesafe.ai` | `jev-latest` |
+| OpenRouter | `https://openrouter.ai/api` | `jev-1.13` 或 `typesafe/jev-1.13` |
+| Vercel AI Gateway | `https://ai-gateway.vercel.sh/typesafe` | `typesafe-ai/jev` |
+
+- 换入口必须同时换 `api_key`（填该入口自己的密钥）和 `model`（命名不通用）；控制台「运行状态」那行会显示当前基址，便于确认在打哪一家。
+- 基址只允许 https 公网主机：带账号密码、带查询串、字面写成环回/内网/保留地址或含 `..` 路径的都会在启动校验时被拒绝（域名不做解析核对），请求也禁用重定向。因此指向自建反代前请确认那是你信任的主机——密钥会原样发给它。
+- 响应差异只体现在多余字段上：OpenRouter 会多 `id`/`provider` 和 `usage.cost`，AI Gateway 多 `provider_metadata`。解析只认 `answers.allow.noul`、`model` 和两个 token 计数，其余忽略，计费用量请以各网关自己的账单页为准。
+- 概率标定不保证跨入口一致：当前默认阈值 `0.5` 是在官方接口上用真实案例实测的，换网关后请在判断历史里重新观察两簇分布，再动阈值。
 
 ## 提示词模板与人格变量
 
@@ -58,7 +73,7 @@
 - 原消息已经进入平台网络发送后的撤回无法追回；分段已经发送出去的部分无法撤销。
 - 接话拒绝不使用 `stop_event()`，而是公开的 `event.should_call_llm(True)` 加 `is_at_or_wake_command = True`：只掐断宿主默认 LLM 链路并抑制内置主动回复，内置群聊上下文（内存 deque）与平台消息历史因此照常记录，无需手动补写。代价是该条被拒消息仍会交给其他插件处理。发送阶段的复核拒绝仍然清空结果并 `stop_event()`，此时不回滚宿主已写入的 LLM 对话历史。
 - Jev 仅接收文本/结构化文本。图片、语音本身不上传到 Jev，依赖宿主预处理得到的文本；超长内容会截断，可能影响判断。外发内容不含平台、会话、消息 ID 或真实用户 ID，但群聊上下文是宿主自己格式化好的行，里面本来就带群昵称与时间戳，只有昵称缺失时才会退化成 `成员N` 这种本次请求内的临时编号。
-- 开启判断意味着相关聊天文本会发送至 **TypeSafe**；启用人格变量也会向其发送人格提示词。只在获授权的群聊使用。
+- 开启判断意味着相关聊天文本会发送至 `api_base` 指向的服务（默认 **TypeSafe** 官方，或你所选的网关，密钥会原样发给它）；启用人格变量也会向其发送人格提示词。只在获授权的群聊使用。
 - 本地历史含聊天内容及人格文本，**明文 SQLite** 存储于 AstrBot 数据目录的 `plugin_data/jev/history.db`。请使用系统目录权限保护；关闭历史不会自动擦除旧数据。
 - 控制台是宿主 Dashboard 内嵌 Page，不再有独立端口、监听地址或令牌。页面运行在受限 iframe（`allow-scripts allow-forms allow-downloads`）中，只能经 `window.AstrBotPluginPage` bridge 访问本插件注册的 API，读不到 Dashboard 的 cookie 与 localStorage。鉴权复用 Dashboard 登录态，因此**任何能登录 Dashboard 的用户都可编辑判断模板**；请把 Dashboard 本身放在受控网络内。
 - API 错误仅保存安全错误码，不记录密钥或 HTTP 错误正文。401/429/529/超时不自动重试，避免积压消息或额外请求。
@@ -76,4 +91,4 @@ git diff --check
 
 测试通过依赖注入使用假 Jev，不读取真实密钥或向真实聊天发送消息。宿主导入测试把 `ASTRBOT_ROOT` 指向插件内的隔离测试目录。现有 `scripts/smoke_live.py` 是遗留导演插件脚本，与本插件无关，不应运行。
 
-官方协议参考：`https://docs.typesafe.ai/api`、`https://docs.typesafe.ai/primitives/noul`。部署仅在明确要求后使用已有 `scripts/deploy_git.sh`，不自动执行。
+协议参考：`https://docs.typesafe.ai/api`、`https://docs.typesafe.ai/primitives/noul`、OpenRouter 的 `https://openrouter.ai/docs/guides/community/typesafe-sdk`、Vercel AI Gateway 的 `https://vercel.com/docs/ai-gateway/sdks-and-apis/typesafe`。部署仅在明确要求后使用已有 `scripts/deploy_git.sh`，不自动执行。

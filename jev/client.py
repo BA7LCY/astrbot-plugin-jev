@@ -1,4 +1,4 @@
-"""TypeSafe 官方 System One HTTP 协议。"""
+"""System One HTTP 协议；基址可指向官方 TypeSafe 或转发网关。"""
 
 import asyncio
 import json
@@ -70,7 +70,7 @@ class JevClient:
         """
         async with self.slots:
             async with self.session.post(
-                "https://api.typesafe.ai/v1/systemone",
+                f"{self.settings.api_base}/v1/systemone",
                 json=payload,
                 headers={"Authorization": f"Bearer {self.settings.api_key.strip()}"},
                 allow_redirects=False,

@@ -64,6 +64,40 @@ async def test_official_protocol_and_chunked_response():
     )
 
 
+@pytest.mark.parametrize(
+    "base,url",
+    [
+        ("https://openrouter.ai/api", "https://openrouter.ai/api/v1/systemone"),
+        (
+            "https://ai-gateway.vercel.sh/typesafe/",
+            "https://ai-gateway.vercel.sh/typesafe/v1/systemone",
+        ),
+    ],
+)
+async def test_gateway_base_url_keeps_same_protocol(base, url):
+    """网关转发的是同一套 systemone 协议，只是基址和模型名不同。"""
+    session = Session(
+        Response(
+            {
+                "id": "gen-1",
+                "provider": "TypeSafe",
+                "model": "typesafe/jev-1.13-20260917",
+                "answers": {"allow": {"type": "noul", "noul": 0.8}},
+                "usage": {"input_tokens": 10, "output_tokens": 2, "cost": 0.00003},
+            }
+        )
+    )
+    client = JevClient(
+        Settings.load({"api_key": "gateway-secret", "api_base": base}), session
+    )
+    assert await client.evaluate({}, "pre", "规则") == {
+        "probability": 0.8,
+        "model": "typesafe/jev-1.13-20260917",
+        "usage": {"input_tokens": 10, "output_tokens": 2},
+    }
+    assert session.calls[0][0] == url
+
+
 @pytest.mark.parametrize("probability", [True, "0.9", None, -1, 2, float("nan")])
 async def test_malformed_answers_are_rejected(probability):
     session = Session(
