@@ -15,7 +15,10 @@ data/
 webui/node_modules/
 /.pi/
 .deploy.local.md
-scripts/deploy_git.sh
+
+# 本机私有的部署脚本、遗留脚本与协作约定，不随插件上传
+scripts/
+AGENTS.md
 
 # Local-only tooling and docs
 .agents/

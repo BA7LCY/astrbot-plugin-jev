@@ -271,7 +271,7 @@ def test_config_validation(overrides):
     [
         "http://api.typesafe.ai",
         "https://127.0.0.1",
-        "https://192.168.3.74",
+        "https://192.168.1.10",
         "https://[::1]",
         "https://localhost",
         "https://jev.internal",

@@ -3,7 +3,7 @@ display_name: Jev 接话判断
 desc: Jev 接话决策、生成后发送复核、OneBot 撤回拦截，以及宿主内嵌的控制台 Page。
 version: v0.1.0
 author: LovieCode
-repo: ""
+repo: "https://github.com/LovieCode/astrbot-plugin-jev"
 astrbot_version: ">=4.27.4,<4.28.0"
 tags:
   - chat
