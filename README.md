@@ -6,7 +6,7 @@
 
 1. 将此目录放入 AstrBot 的 `data/plugins`，在插件管理中加载。当前针对 AstrBot **4.27.4** 验证，元数据限定 `<4.28.0`。
 2. 在插件配置填写 TypeSafe `api_key`。使用官方 `POST /v1/systemone`，不是 OpenAI 兼容接口；模型默认 `jev-latest`。
-3. 开启 `enabled`。群聊默认纳入判断；私聊必须另开 `private_enabled`。插件默认总开关关闭，防止未配置时意外拦截。
+3. 开启 `enabled`，再按需单独打开 `group_enabled`（群聊接管）和 `private_enabled`（私聊接管）。两者**默认关闭**，只开 `enabled` 不会改变任何聊天行为。开启后仍只接管通过宿主会话白名单与主动回复白名单的会话。
 4. 控制台无需额外开关或端口：重新加载插件后，在 AstrBot WebUI 的插件管理中进入本插件详情页，打开 **Jev 控制台** Page。新增或删除 `pages/` 下的目录需要重载插件才会被发现。
 
 已有 `aiohttp` 即可，无额外 SDK、前端构建或数据库服务。修改宿主插件配置后重新加载；Page 内模板保存后下一次判断立即生效。此仓库不修改宿主 dashboard/OpenAPI，因此不需要生成宿主 API client。
@@ -32,8 +32,8 @@
 | 配置 | 行为 |
 | --- | --- |
 | `enabled` | 总开关；关闭后不改变消息的宿主处理方式 |
-| `group_enabled` / `private_enabled` | 分别控制群聊 / 私聊是否接管 |
-| `pre_check_enabled` | 判断是否接话；放行时唤醒宿主 LLM，拒绝时停止该消息的后续处理 |
+| `group_enabled` / `private_enabled` | 分别控制群聊 / 私聊是否接管，**默认都关闭**；关闭时该场景保持宿主原行为 |
+| `pre_check_enabled` | 判断是否接话；放行时唤醒宿主 LLM，拒绝时只掐断该消息的默认 LLM 链路 |
 | `post_check_enabled` | LLM 完整生成后，使用最新上下文复核候选回复 |
 | `recall_enabled` | 独立硬规则：原消息撤回后不发送，不受 API 故障放行影响 |
 | `context_enabled` | 内存收集近期受管消息和实际发送的机器人回复 |
@@ -54,10 +54,10 @@
 ## 边界与隐私
 
 - 撤回事件目前支持 **OneBot v11** 的 `group_recall` / `friend_recall`。其他平台未接入撤回转换，不宣称具有撤回保护。
-- 保留 AstrBot 白名单、会话开关、权限与限流管道。上下文仅覆盖通过这些管道并被插件观察到的消息。
+- 接管范围由宿主两层白名单共同决定，任一层非空且不命中即完全不接管（不发判断请求、不采集上下文、不改流式输出）：`platform_settings.enable_id_white_list` + `id_whitelist`（沿用宿主的 `wl_ignore_admin_on_group` / `wl_ignore_admin_on_friend` 管理员豁免和 webchat 豁免）与 `provider_ltm_settings.active_reply.whitelist`（按主动回复的语义只约束群聊）。同时保留宿主会话开关、权限与限流管道。
 - 本插件针对宿主回复管道。工具、其他插件直接调用独立发送 API、非标准 Agent 输出或更晚修改发送方法的插件可能绕过检查。与其他主动接话插件同时启用可能冲突。
 - 原消息已经进入平台网络发送后的撤回无法追回；分段已经发送出去的部分无法撤销。
-- 接话拒绝使用 `stop_event()`，会阻止本条消息后续插件处理；注册命令默认旁路。发送拒绝不会回滚宿主可能已写入的 LLM 对话历史。
+- 接话拒绝不使用 `stop_event()`，而是公开的 `event.should_call_llm(True)` 加 `is_at_or_wake_command = True`：只掐断宿主默认 LLM 链路并抑制内置主动回复，内置群聊上下文（内存 deque）与平台消息历史因此照常记录，无需手动补写。代价是该条被拒消息仍会交给其他插件处理。发送阶段的复核拒绝仍然清空结果并 `stop_event()`，此时不回滚宿主已写入的 LLM 对话历史。
 - Jev 仅接收文本/结构化文本。图片、语音本身不上传到 Jev，依赖宿主预处理得到的文本；超长内容会截断，可能影响判断。外发内容不含平台、会话、消息 ID 或真实用户 ID，说话人只是本次请求内的临时编号。
 - 开启判断意味着相关聊天文本会发送至 **TypeSafe**；启用人格变量也会向其发送人格提示词。只在获授权的群聊使用。
 - 本地历史含聊天内容及人格文本，**明文 SQLite** 存储于 AstrBot 数据目录的 `plugin_data/jev/history.db`。请使用系统目录权限保护；关闭历史不会自动擦除旧数据。

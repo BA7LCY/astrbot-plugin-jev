@@ -22,10 +22,12 @@ class IngressFilter(filter.CustomFilter):
             cfg: 宿主会话配置。
 
         Returns:
-            是否安排异步接话判断；通知永不主动唤醒 LLM。
+            是否安排异步接话判断；不在白名单范围内或为通知时返回 False。
         """
         adapter = self.adapter
         if adapter is None or not adapter.engine.active(event.is_private_chat()):
+            return False
+        if not adapter.in_scope(event):
             return False
         raw = event.message_obj.raw_message
         if isinstance(raw, dict) and raw.get("post_type") == "notice":
@@ -80,11 +82,70 @@ class AstrBotAdapter:
             ensure_ascii=False,
         )
 
+    @staticmethod
+    def listed(event, ids: list[str]) -> bool:
+        """按宿主同款规则匹配：会话 unified_msg_origin 或群号命中任意一项。
+
+        Args:
+            event: 消息事件。
+            ids: 已清洗的白名单。
+
+        Returns:
+            是否命中白名单。
+        """
+        return (
+            event.unified_msg_origin in ids or str(event.get_group_id()).strip() in ids
+        )
+
+    def in_scope(self, event) -> bool:
+        """核对宿主两层白名单，决定是否允许接管该会话。
+
+        Args:
+            event: 消息事件。
+
+        Returns:
+            是否可接管；读不到会话配置时不接管。
+        """
+        if self.context is None or event.get_platform_name() == "webchat":
+            return True
+        try:
+            cfg = self.context.get_config(umo=event.unified_msg_origin)
+        except Exception:
+            return False
+        settings = cfg.get("platform_settings", {})
+        ids = [
+            str(i).strip() for i in settings.get("id_whitelist", []) if str(i).strip()
+        ]
+        admin_exempt = event.is_admin() and (
+            settings.get("wl_ignore_admin_on_group")
+            if not event.is_private_chat()
+            else settings.get("wl_ignore_admin_on_friend")
+        )
+        if settings.get("enable_id_white_list") and ids and not admin_exempt:
+            if not self.listed(event, ids):
+                return False
+        active_reply = cfg.get("provider_ltm_settings", {}).get("active_reply", {})
+        ids = [
+            str(i).strip() for i in active_reply.get("whitelist", []) if str(i).strip()
+        ]
+        if ids and not event.is_private_chat():
+            return self.listed(event, ids)
+        return True
+
+    @staticmethod
+    def restore_streaming(event) -> None:
+        """Jev 不产生回复时，把流式输出交还给宿主原配置。
+
+        Args:
+            event: 消息事件。
+        """
+        event.set_extra("enable_streaming", event.get_extra("jev_original_streaming"))
+
     async def receive(self, event) -> None:
         """接管普通聊天；已匹配的插件命令默认旁路。
 
         Args:
-            event: 已通过宿主白名单及权限管道的消息。
+            event: 已通过宿主白名单范围检查的消息。
         """
         if not self.engine.active(event.is_private_chat()):
             return
@@ -96,9 +157,7 @@ class AstrBotAdapter:
                 for item in handler.event_filters
             ):
                 event.set_extra("jev_bypass", True)
-                event.set_extra(
-                    "enable_streaming", event.get_extra("jev_original_streaming")
-                )
+                self.restore_streaming(event)
                 return
         message = Message(
             session=self.session_key(event),
@@ -115,7 +174,11 @@ class AstrBotAdapter:
         allowed = await self.engine.decide("pre", message)
         event.set_extra("jev_pre_allowed", allowed)
         if not allowed:
-            event.stop_event()
+            # stop_event 会连带跳过内置的群聊上下文记录，这里只掐断默认 LLM 链路。
+            event.set_extra("jev_rejected", True)
+            self.restore_streaming(event)
+            event.should_call_llm(True)
+            event.is_at_or_wake_command = True
         elif self.engine.settings.pre_check_enabled:
             event.is_at_or_wake_command = True
             event.is_wake = True
@@ -157,7 +220,11 @@ class AstrBotAdapter:
             event: 正要发送 LLM 请求的宿主事件。
         """
         message = event.get_extra("jev_message")
-        if message is None or event.get_extra("jev_bypass"):
+        if (
+            message is None
+            or event.get_extra("jev_bypass")
+            or event.get_extra("jev_rejected")
+        ):
             return
         if not self.engine.active(message.private):
             return

@@ -7,7 +7,7 @@ from math import isfinite
 @dataclass(frozen=True)
 class Settings:
     enabled: bool = False
-    group_enabled: bool = True
+    group_enabled: bool = False
     private_enabled: bool = False
     pre_check_enabled: bool = True
     post_check_enabled: bool = True

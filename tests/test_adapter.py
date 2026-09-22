@@ -45,7 +45,7 @@ def event(private=False, raw=None, message_id="1"):
 
 @pytest.fixture
 def adapter():
-    engine = Engine(Settings(enabled=True), Judge(), None)
+    engine = Engine(Settings(enabled=True, group_enabled=True), Judge(), None)
     result = AstrBotAdapter(engine)
     IngressFilter.adapter = result
     yield result
@@ -122,6 +122,66 @@ async def test_pre_disabled_preserves_wakeup(adapter):
     await adapter.receive(msg)
     assert not msg.is_at_or_wake_command
     assert not adapter.engine.judge.calls
+
+
+async def test_rejection_only_blocks_default_llm_chain(adapter):
+    """被拒消息不再 stop_event，内置的群聊上下文记录等后续处理照常运行。"""
+    msg = event()
+    msg.set_extra("enable_streaming", True)
+    assert IngressFilter().filter(msg, {})
+    adapter.engine.judge.probability = 0.1
+    await adapter.receive(msg)
+    assert msg.get_extra("jev_rejected")
+    assert not msg.is_stopped()
+    assert msg.call_llm is True
+    assert msg.is_at_or_wake_command
+    assert msg.get_extra("enable_streaming") is True
+    await adapter.before_llm(msg)
+    assert not msg.get_extra("jev_generation")
+    assert len(adapter.engine.judge.calls) == 1
+
+
+def host_config(platform=None, active=None, broken=False):
+    def get_config(umo):
+        if broken:
+            raise RuntimeError("no session config")
+        return {
+            "platform_settings": platform or {},
+            "provider_ltm_settings": {"active_reply": active or {}},
+        }
+
+    return SimpleNamespace(get_config=get_config)
+
+
+async def test_host_id_whitelist_gates_takeover(adapter):
+    msg = event()
+    adapter.context = host_config({"enable_id_white_list": True, "id_whitelist": [""]})
+    assert IngressFilter().filter(msg, {})
+    adapter.context = host_config(
+        {"enable_id_white_list": True, "id_whitelist": ["other"]}
+    )
+    assert not IngressFilter().filter(event(), {})
+    adapter.context = host_config(
+        {
+            "enable_id_white_list": True,
+            "id_whitelist": ["other"],
+            "wl_ignore_admin_on_group": True,
+        }
+    )
+    admin = event()
+    admin.role = "admin"
+    assert IngressFilter().filter(admin, {})
+    adapter.context = host_config(broken=True)
+    assert not IngressFilter().filter(event(), {})
+
+
+async def test_active_reply_whitelist_gates_group_only(adapter):
+    adapter.context = host_config(active={"whitelist": ["other-group"]})
+    assert not IngressFilter().filter(event(), {})
+    adapter.context = host_config(active={"whitelist": ["group"]})
+    assert IngressFilter().filter(event(), {})
+    adapter.engine.settings = replace(adapter.engine.settings, private_enabled=True)
+    assert IngressFilter().filter(event(private=True), {})
 
 
 async def test_registered_commands_bypass(adapter):

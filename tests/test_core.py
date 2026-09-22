@@ -30,7 +30,7 @@ class Judge:
 @pytest.fixture
 def setup_engine(tmp_path):
     def build(**overrides):
-        cfg = Settings.load({"enabled": True, **overrides})
+        cfg = Settings.load({"enabled": True, "group_enabled": True, **overrides})
         judge = Judge()
         store = History(tmp_path / "history.db", cfg.history_limit)
         return Engine(cfg, judge, store), judge, store

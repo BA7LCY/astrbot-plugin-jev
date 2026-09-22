@@ -8,14 +8,14 @@
   "group_enabled": {
     "description": "群聊接管",
     "type": "bool",
-    "default": true,
-    "hint": "仍遵守 AstrBot 群白名单和会话开关。"
+    "default": false,
+    "hint": "默认关闭，关闭时群聊保持宿主原行为。开启后仍须通过宿主会话白名单和主动回复白名单。"
   },
   "private_enabled": {
     "description": "私聊接管",
     "type": "bool",
     "default": false,
-    "hint": "默认关闭，关闭时私聊保持宿主原行为。"
+    "hint": "默认关闭，关闭时私聊保持宿主原行为。开启后仍须通过宿主会话白名单。"
   },
   "pre_check_enabled": {
     "description": "接话前判断",
