@@ -232,6 +232,16 @@ class Engine:
             record.update(allowed=False, reason="recalled")
         elif stage == "final":
             return True
+        elif (
+            cfg.bypass_addressed
+            and message.addressed
+            and stage in ("pre", "post")
+            and (
+                not cfg.bypass_addressed_whitelist
+                or str(message.sender).strip() in cfg.bypass_addressed_whitelist
+            )
+        ):
+            record.update(allowed=True, reason="addressed_bypass")
         elif stage == "probe" or (
             cfg.pre_check_enabled if stage == "pre" else cfg.post_check_enabled
         ):
