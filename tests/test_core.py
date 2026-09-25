@@ -84,6 +84,40 @@ async def test_independent_switches(setup_engine):
     assert len(judge.calls) == 1
 
 
+async def test_addressed_bypasses_judgment_but_not_recall(setup_engine):
+    engine, judge, store = setup_engine()
+    judge.probability = 0.0
+    msg = Message("g", "1", "u", "x", addressed=True)
+    assert await engine.decide("pre", msg)
+    assert await engine.decide("post", msg, "reply")
+    assert not judge.calls
+    assert store.recent()[0]["reason"] == "addressed_bypass"
+    msg.recalled = True
+    assert not await engine.decide("pre", msg)
+    engine.settings = replace(engine.settings, bypass_addressed=False)
+    msg.recalled = False
+    assert not await engine.decide("pre", msg)
+    assert len(judge.calls) == 1
+
+
+@pytest.mark.parametrize("sender,in_list", [("10001", True), ("10002", False)])
+async def test_addressed_whitelist_gates_bypass(setup_engine, sender, in_list):
+    engine, judge, _ = setup_engine(
+        bypass_addressed_whitelist=["10001", "  ", 10001]
+    )
+    judge.probability = 0.0
+    assert await engine.decide("pre", Message("g", "1", sender, "x", addressed=True)) is in_list
+    assert len(judge.calls) == (0 if in_list else 1)
+
+
+def test_whitelist_setting_validation():
+    settings = Settings.load({"bypass_addressed_whitelist": [10001, 10001, " 10002 "]})
+    assert settings.bypass_addressed_whitelist == ["10001", "10002"]
+    with pytest.raises(ValueError):
+        Settings.load({"bypass_addressed_whitelist": "10001"})
+    assert Settings.load({"bypass_addressed_whitelist": ["  "]}).bypass_addressed_whitelist == []
+
+
 @pytest.mark.parametrize("fail_open", [True, False])
 async def test_error_policy_never_bypasses_recall(setup_engine, fail_open):
     engine, judge, store = setup_engine(fail_open=fail_open)
