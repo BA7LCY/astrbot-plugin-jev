@@ -4,7 +4,7 @@ desc: Jev 接话决策、生成后发送复核、OneBot 撤回拦截，以及宿
 version: v0.1.0
 author: LovieCode
 repo: "https://github.com/LovieCode/astrbot-plugin-jev"
-astrbot_version: ">=4.27.4,<4.28.0"
+astrbot_version: ">=4.27.4"
 tags:
   - chat
   - moderation
