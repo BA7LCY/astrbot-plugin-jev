@@ -7,10 +7,10 @@ const names = {
   enabled: "插件总开关", group_enabled: "群聊", private_enabled: "私聊",
   pre_check_enabled: "接话判断", post_check_enabled: "发送复核",
   recall_enabled: "撤回拦截", history_enabled: "历史记录",
-  bypass_commands: "命令旁路", fail_open: "故障放行",
+  bypass_commands: "命令旁路", bypass_addressed: "@跳过判断", fail_open: "故障放行",
 };
 const reasons = {
-  threshold: "概率阈值", recalled: "原消息已撤回",
+  threshold: "概率阈值", recalled: "原消息已撤回", addressed_bypass: "被@直接放行",
   recalled_during_check: "判断期间撤回", judge_error: "判断服务故障",
   disabled: "功能旁路",
 };
