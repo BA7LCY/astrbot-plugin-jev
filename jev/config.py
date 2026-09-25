@@ -1,7 +1,7 @@
 """配置定义与启动校验。"""
 
 import ipaddress
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from math import isfinite
 from urllib.parse import urlsplit
 
@@ -58,6 +58,8 @@ class Settings:
     recall_enabled: bool = True
     history_enabled: bool = True
     bypass_commands: bool = True
+    bypass_addressed: bool = True
+    bypass_addressed_whitelist: list[str] = field(default_factory=list)
     fail_open: bool = False
     api_key: str = ""
     api_base: str = DEFAULT_API_BASE
@@ -91,10 +93,18 @@ class Settings:
                 valid = type(value) is int
             elif isinstance(default, float):
                 valid = type(value) in (int, float) and isfinite(value)
+            elif isinstance(default, list):
+                valid = isinstance(value, list) and all(
+                    isinstance(item, (str, int)) for item in value
+                )
             else:
                 valid = isinstance(value, str)
             if not valid:
                 raise ValueError(f"Invalid setting: {field.name}")
+            if isinstance(value, list):
+                value = sorted(
+                    {str(item).strip() for item in value if str(item).strip()}
+                )
             data[field.name] = value
         data["api_base"] = normalize_api_base(data["api_base"])
         result = cls(**data)
