@@ -47,6 +47,18 @@
     "default": true,
     "hint": "被 AstrBot 认成指令的消息（比如 /help、各插件自己的命令）直接跳过判断，照常执行。关掉后这些指令也会先过一遍判断，可能被误拦。"
   },
+  "bypass_addressed": {
+    "description": "@机器人时跳过判断",
+    "type": "bool",
+    "default": true,
+    "hint": "被 @（或命中唤醒词）的消息不走前两道判断，直接照常唤醒并回复；毕竟对方就是点名找机器人的。关掉后 @ 消息同样要先过判断，可能被误拦。撤回这条硬规则不受影响。"
+  },
+  "bypass_addressed_whitelist": {
+    "description": "@跳过判断的 QQ 号白名单",
+    "type": "list",
+    "default": [],
+    "hint": "只有当「@机器人时跳过判断」开着才生效。留空表示不启用，任何人 @ 都会跳过判断；填入 QQ 号后，只有名单里这些人 @ 机器人才跳过，其他人 @ 仍然要先过判断。一行填一个，只填数字 QQ 号。"
+  },
   "fail_open": {
     "description": "判断失败时是否放行",
     "type": "bool",
