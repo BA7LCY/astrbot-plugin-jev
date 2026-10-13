@@ -1,0 +1,27 @@
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.pytest-tmp-*/
+.ruff_cache/
+.coverage
+htmlcov/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+data/
+*.log
+webui/node_modules/
+/.pi/
+.deploy.local.md
+
+# 本机私有的部署脚本、遗留脚本与协作约定，不随插件上传
+scripts/
+AGENTS.md
+
+# Local-only tooling and docs
+.agents/
+.trae/
+docs/
+

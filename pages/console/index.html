@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Jev · 接话控制台</title>
+  <link rel="stylesheet" href="./style.css">
+  <script type="module" src="./app.js"></script>
+</head>
+<body>
+  <main>
+    <header>
+      <div><div class="eyebrow">JEV / CONVERSATION GATE</div><h1>少一点打扰，<span>多一点恰好。</span></h1><p>接话判断 · 发送复核 · 撤回保护</p></div>
+      <span class="pill" id="connection">加载中</span>
+    </header>
+    <p id="notice" role="status" aria-live="polite"></p>
+    <div id="workspace">
+      <div class="metrics">
+        <section class="panel"><span class="eyebrow">运行状态</span><h2 id="running">—</h2><p id="model" class="muted"></p></section>
+        <section class="panel"><span class="eyebrow">本次启动 / 判断</span><strong id="decisions">0</strong><p class="muted">包含旁路记录与手动探针</p></section>
+        <section class="panel"><span class="eyebrow">本次启动 / 放行</span><strong id="allowed">0</strong><p class="muted">正判断通过或未被接管的记录</p></section>
+        <section class="panel"><span class="eyebrow">本次启动 / 拦截</span><strong id="blocked">0</strong><p id="storage" class="muted"></p></section>
+      </div>
+      <nav aria-label="控制台分区">
+        <button class="tab active" data-tab="history">判断历史</button>
+        <button class="tab" data-tab="health">运行检查</button>
+        <button class="tab" data-tab="policy">补充说明（选填）</button>
+      </nav>
+      <section id="history" class="panel tab-panel">
+        <div class="section-title"><div><h2>每一次开口，都有迹可循</h2><p class="muted">包含当次上下文、三段问题、逐项分数与拦截原因；不等于消息已发送。</p></div><button id="refresh-history" class="secondary">刷新记录</button></div>
+        <div id="history-list"></div><button id="more-history" class="secondary" hidden>加载更早记录</button>
+      </section>
+      <section id="health" class="panel tab-panel" hidden>
+        <h2>运行检查</h2><p class="muted">功能开关在 AstrBot 插件配置中修改，重新加载插件生效。</p>
+        <div id="switches" class="switches"></div>
+        <div class="toolbar"><button id="refresh-status" class="secondary">刷新状态</button><button id="probe">调用 Jev 测试连接</button></div>
+        <p class="hint">连接测试会向 TypeSafe 发送一条固定的虚构问候，产生一次 API 用量。不发送真实聊天，不触发机器人回复。</p>
+        <pre id="probe-output">尚未运行手动检查。</pre>
+        <p class="hint">撤回支持 OneBot v11 群聊 / 私聊通知。只保证受管的 AstrBot 回复管道，不拦截工具或其他插件绕过管道的直接发送；已进入平台网络发送的消息无法追回。</p>
+      </section>
+      <section id="policy" class="panel tab-panel" hidden>
+        <div class="section-title"><div><h2>聊天偏好</h2><p class="muted">判断题目是内置的，装上就能用，这里可留空。填了会拼到每道题末尾，所有阶段（接话、复核、时效）共用；保存后下一次判断立即生效，不修改 AstrBot 原本的人格。</p></div><span class="pill">选填</span></div>
+        <p class="hint">大白话即可，例如「多接梗、少说教」「别掺和报销话题」。变量：<code>{{persona}}</code> —— 当前会话生效的 AstrBot 人格提示词，写了才注入，没写就不发送。</p>
+        <div class="row"><button type="button" class="quiet insert" data-target="guidance">插入人格变量</button></div>
+        <textarea id="guidance" rows="8" maxlength="6000" spellcheck="false" placeholder="多接梗、少说教，回答简短一点。"></textarea>
+        <div class="toolbar"><button id="save-policy">保存偏好</button><button id="reset-policy" class="secondary">清空</button><button id="export-policy" class="secondary">导出 JSON</button><span class="muted">清空仅改编辑器，点保存才生效。</span></div>
+        <details id="import-box"><summary>导入 JSON</summary><p class="hint">把别处导出的完整规则 JSON 粘进来，点「填入下面」后检查一遍再保存。</p><textarea id="import-text" rows="4" spellcheck="false" placeholder="这是别处复制的规则 JSON"></textarea><div class="toolbar"><button id="import-fill" class="secondary">填入下面</button></div></details>
+        <details><summary>展开预览 · 不调用模型</summary><div class="toolbar"><label for="preview-session">会话快照</label><select id="preview-session"><option value="">无会话 / 空人格</option></select><button id="preview" class="secondary">预览当前草稿</button></div><p id="preview-note" class="hint"></p><pre id="preview-output">选择会话快照后点「预览当前草稿」，即可看到偏好拼进题目后的完整指令样例。</pre></details>
+        <details id="overrides-box"><summary>高级：提示词覆写</summary><p class="hint">留空则使用内置原文；填了就整段替换。防注入提示会自动保留在题面前，无法删除。criteria 留空也使用内置判定标准。</p><div id="overrides"></div></details>
+      </section>
+    </div>
+    <footer>Jev 决定要不要说，AstrBot 决定怎么说。<span>内嵌控制台 / 不使用第三方静态资源</span></footer>
+  </main>
+</body>
+</html>
