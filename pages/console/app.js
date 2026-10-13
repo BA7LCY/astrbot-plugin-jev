@@ -2,6 +2,7 @@
 const bridge = window.AstrBotPluginPage;
 const $ = (id) => document.getElementById(id);
 let defaults = null;
+let defaultQuestions = {};
 let cursor = 0;
 const names = {
   enabled: "插件总开关", group_enabled: "群聊", private_enabled: "私聊",
@@ -41,23 +42,32 @@ function buildOverrides() {
     const wrap = document.createElement("div"); wrap.className = "override";
     const title = document.createElement("label"); title.textContent = label;
     const ta = document.createElement("textarea"); ta.rows = 5; ta.dataset.q = key; ta.className = "ov-instructions";
-    ta.placeholder = "留空 = 用内置题面";
-    const yes = document.createElement("input"); yes.className = "ov-true"; yes.dataset.q = key; yes.placeholder = "算作「是」的标准（留空用内置）";
-    const no = document.createElement("input"); no.className = "ov-false"; no.dataset.q = key; no.placeholder = "算作「否」的标准（留空用内置）";
+    const preset = defaultQuestions[key];
+    ta.value = preset ? preset.instructions : "";
+    ta.placeholder = "这里是内置题面原文；改成别的才会作为覆写保存";
+    const yes = document.createElement("input"); yes.className = "ov-true"; yes.dataset.q = key;
+    yes.value = (preset && preset.criteria.true) || "";
+    yes.placeholder = "算作「是」的标准"
+    const no = document.createElement("input"); no.className = "ov-false"; no.dataset.q = key;
+    no.value = (preset && preset.criteria.false) || "";
+    no.placeholder = "算作「否」的标准";
     wrap.append(title, ta, yes, no); box.append(wrap);
   }
 }
 function draft() {
   const overrides = {};
   for (const ta of document.querySelectorAll(".ov-instructions")) {
-    const key = ta.dataset.q, instructions = ta.value.trim();
+    const key = ta.dataset.q;
+    let instructions = ta.value.trim();
+    const preset = defaultQuestions[key] || {};
+    if (instructions === ((preset.instructions) || "").trim()) instructions = "";
     const yes = document.querySelector(`.ov-true[data-q="${key}"]`).value.trim();
     const no = document.querySelector(`.ov-false[data-q="${key}"]`).value.trim();
     const entry = {};
     if (instructions) entry.instructions = instructions;
     const criteria = {};
-    if (yes) criteria.true = yes;
-    if (no) criteria.false = no;
+    if (yes && yes !== ((preset.criteria || {}).true || "").trim()) criteria.true = yes;
+    if (no && no !== ((preset.criteria || {}).false || "").trim()) criteria.false = no;
     if (Object.keys(criteria).length) entry.criteria = criteria;
     if (Object.keys(entry).length) overrides[key] = entry;
   }
@@ -68,9 +78,10 @@ function fill(policy) {
   const overrides = policy.overrides || {};
   for (const [key] of QUESTION_META) {
     const entry = overrides[key] || {};
-    document.querySelector(`.ov-instructions[data-q="${key}"]`).value = entry.instructions || "";
-    document.querySelector(`.ov-true[data-q="${key}"]`).value = (entry.criteria && entry.criteria.true) || "";
-    document.querySelector(`.ov-false[data-q="${key}"]`).value = (entry.criteria && entry.criteria.false) || "";
+    const preset = defaultQuestions[key] || {};
+    document.querySelector(`.ov-instructions[data-q="${key}"]`).value = entry.instructions || preset.instructions || "";
+    document.querySelector(`.ov-true[data-q="${key}"]`).value = (entry.criteria && entry.criteria.true) || (preset.criteria && preset.criteria.true) || "";
+    document.querySelector(`.ov-false[data-q="${key}"]`).value = (entry.criteria && entry.criteria.false) || (preset.criteria && preset.criteria.false) || "";
   }
 }
 async function status() {
@@ -136,7 +147,7 @@ document.querySelectorAll(".insert").forEach((button) => {
     editor.focus(); notice("已插入 {{persona}}；保存后偏好会带上当前会话人格。");
   };
 });
-buildOverrides();
+
 $("export-policy").onclick = () => action($("export-policy"), async () => {
   await navigator.clipboard.writeText(JSON.stringify(draft(), null, 2));
   notice("已把当前规则（含覆写）复制到剪贴板，可发给别人或存起来。");
@@ -168,9 +179,12 @@ $("more-history").onclick = () => action($("more-history"), () => history(false)
 
 async function connect() {
   try {
-    await bridge.ready();
-    await status();
-    const data = await bridge.apiGet("policy");
+  await bridge.ready();
+  await status();
+  const questions = await bridge.apiGet("questions");
+  defaultQuestions = questions.questions || {};
+  buildOverrides();
+  const data = await bridge.apiGet("policy");
     defaults = data.defaults;
     fill(data.policy);
     await history();

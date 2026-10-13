@@ -1,7 +1,7 @@
 name: astrbot_plugin_jev
 display_name: Jev 接话判断
 desc: Jev 接话决策、生成后发送复核、OneBot 撤回拦截，以及宿主内嵌的控制台 Page。
-version: v0.2.0
+version: v0.2.1
 author: BA7LCY
 repo: "https://github.com/BA7LCY/astrbot-plugin-jev"
 astrbot_version: ">=4.27.4"

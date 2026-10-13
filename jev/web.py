@@ -10,7 +10,7 @@ from astrbot.api.web import error_response, json_response, request
 
 from .config import Settings
 from .engine import Engine, Message
-from .policy import Policy
+from .policy import Policy, default_questions
 
 
 def build_handlers(state: dict[str, Engine | None], policy_path: Path | None) -> dict:
@@ -91,6 +91,10 @@ def build_handlers(state: dict[str, Engine | None], policy_path: Path | None) ->
             else []
         )
         return json_response({"records": rows})
+
+    async def get_questions():
+        """供控制台覆写区显示内置提示词原文。"""
+        return json_response({"questions": default_questions()})
 
     async def get_policy():
         current = state.get("engine")
@@ -175,6 +179,7 @@ def build_handlers(state: dict[str, Engine | None], policy_path: Path | None) ->
     return {
         "status": (guard(status), ["GET"]),
         "history": (guard(history), ["GET"]),
+        "questions": (guard(get_questions), ["GET"]),
         "policy": (guard(get_policy), ["GET"]),
         "policy/save": (guard(save_policy), ["POST"]),
         "preview": (guard(preview), ["POST"]),

@@ -93,6 +93,22 @@ STYLE_BASE = {"quiet": 0.86, "balanced": 0.78, "sociable": 0.70}
 ALL_QUESTION_NAMES = frozenset(INTAKE_QUESTIONS) | frozenset(REVIEW_QUESTIONS)
 
 
+def default_questions() -> dict:
+    """控制台展示用：内置题面原文与 criteria，去掉防注入尾巴。"""
+    all_questions = {**INTAKE_QUESTIONS, **REVIEW_QUESTIONS}
+    return {
+        name: {
+            "instructions": (
+                item["instructions"][: -len(GUARD)]
+                if item["instructions"].endswith(GUARD)
+                else item["instructions"]
+            ),
+            "criteria": dict(item["criteria"]),
+        }
+        for name, item in all_questions.items()
+    }
+
+
 def stage_questions(stage: str) -> dict:
     """返回该阶段的题库：pre/probe 接话，post 发送复核（含时效）。final 不再单独出题，仅由撤回硬规则把关。"""
     if stage in ("pre", "probe"):

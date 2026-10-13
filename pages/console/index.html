@@ -46,7 +46,7 @@
         <div class="toolbar"><button id="save-policy">保存偏好</button><button id="reset-policy" class="secondary">清空</button><button id="export-policy" class="secondary">导出 JSON</button><span class="muted">清空仅改编辑器，点保存才生效。</span></div>
         <details id="import-box"><summary>导入 JSON</summary><p class="hint">把别处导出的完整规则 JSON 粘进来，点「填入下面」后检查一遍再保存。</p><textarea id="import-text" rows="4" spellcheck="false" placeholder="这是别处复制的规则 JSON"></textarea><div class="toolbar"><button id="import-fill" class="secondary">填入下面</button></div></details>
         <details><summary>展开预览 · 不调用模型</summary><div class="toolbar"><label for="preview-session">会话快照</label><select id="preview-session"><option value="">无会话 / 空人格</option></select><button id="preview" class="secondary">预览当前草稿</button></div><p id="preview-note" class="hint"></p><pre id="preview-output">选择会话快照后点「预览当前草稿」，即可看到偏好拼进题目后的完整指令样例。</pre></details>
-        <details id="overrides-box"><summary>高级：提示词覆写</summary><p class="hint">留空则使用内置原文；填了就整段替换。防注入提示会自动保留在题面前，无法删除。criteria 留空也使用内置判定标准。</p><div id="overrides"></div></details>
+        <details id="overrides-box"><summary>高级：提示词覆写</summary><p class="hint">每个框里直接显示内置原文，改成别的话才会保存为覆写；保持原文不动就不算修改。防注入提示会自动保留，看不到也删不掉。</p><div id="overrides"></div></details>
       </section>
     </div>
     <footer>Jev 决定要不要说，AstrBot 决定怎么说。<span>内嵌控制台 / 不使用第三方静态资源</span></footer>
