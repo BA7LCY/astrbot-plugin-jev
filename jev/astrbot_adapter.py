@@ -186,6 +186,40 @@ class AstrBotAdapter:
         """
         event.set_extra("enable_streaming", event.get_extra("jev_original_streaming"))
 
+    def shared_context_lines(self, event) -> list[str]:
+        """优先读上下文插件（astrbot_plugin_context_aware）的最近消息；没有就空。
+
+        调它的 get_recent_messages(unified_msg_origin, count)；读不到或不是合法结构就返回空。
+        """
+        try:
+            for metadata in self.context.get_all_stars():
+                if getattr(metadata, "name", "") != "astrbot_plugin_context_aware":
+                    continue
+                cls = getattr(metadata, "star_cls", None)
+                getter = getattr(cls, "get_recent_messages", None)
+                if not callable(getter):
+                    return []
+                records = getter(event.unified_msg_origin, count=20)
+                if not isinstance(records, list) or not records:
+                    return []
+                lines = []
+                for record in records[-20:]:
+                    if not isinstance(record, dict):
+                        continue
+                    text = str(record.get("content") or "").strip()
+                    if not text:
+                        continue
+                    name = (
+                        "机器人"
+                        if record.get("is_bot")
+                        else str(record.get("sender_name") or "")
+                    )
+                    lines.append(f"{name}：{text}")
+                return lines
+        except Exception:
+            return []
+        return []
+
     def host_group_lines(self, event) -> list[str]:
         """复制宿主内置群聊上下文里尚未注入的那几行，完全跟随其状态。
 
@@ -266,11 +300,14 @@ class AstrBotAdapter:
             if private
             else str(event.message_obj.sender.nickname or ""),
             conversation=(
-                await self.host_history_lines(event)
-                if private
-                else self.host_group_lines(event)
-            )
-            or self.engine.fallback_lines(session_key),
+                (
+                    await self.host_history_lines(event)
+                    if private
+                    else self.host_group_lines(event)
+                )
+                or self.shared_context_lines(event)
+                or self.engine.fallback_lines(session_key)
+            ),
         )
         event.set_extra("jev_message", message)
         self.engine.observe(message)
