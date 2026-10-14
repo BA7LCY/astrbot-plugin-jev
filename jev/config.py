@@ -48,15 +48,8 @@ def normalize_api_base(value: str) -> str:
     return base
 
 
-STYLE_ALIASES = {
-    # 中文是面板下拉的可选值；英文仅作旧配置的兼容读路，面板不再推荐。
-    "安静": "quiet", "平衡": "balanced", "活泼": "sociable",
-    "quiet": "quiet", "balanced": "balanced", "sociable": "sociable",
-}
-SCOPE_ALIASES = {
-    "同群": "group", "同人": "sender", "全局": "global",
-    "group": "group", "sender": "sender", "global": "global",
-}
+STYLE_ALIASES = {"安静": "quiet", "平衡": "balanced", "活泼": "sociable"}
+SCOPE_ALIASES = {"同群": "group", "同人": "sender", "全局": "global"}
 
 
 def alias(value, table: dict, name: str) -> str:

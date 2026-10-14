@@ -255,7 +255,15 @@ class Policy:
         Raises:
             ValueError: 字段、类型、长度或变量非法。
         """
-        if not isinstance(values, dict) or not set(values) <= {"guidance", "overrides"}:
+        if not isinstance(values, dict):
+            raise ValueError("policy 必须是映射")
+        if set(values) <= {"pre_prompt", "post_prompt"} and "guidance" not in values:
+            # 迁移老格式：旧的接话/复核两段模板合并成一份聊天偏好。
+            legacy = (values.get("pre_prompt", ""), values.get("post_prompt", ""))
+            if all(isinstance(text, str) for text in legacy):
+                parts = [text.strip() for text in legacy]
+                values = {"guidance": "\n".join(text for text in parts if text)}
+        if not set(values) <= {"guidance", "overrides"}:
             raise ValueError("只允许 guidance 与 overrides 字段")
         text = values.get("guidance", "")
         if not isinstance(text, str) or len(text.strip()) > 6000:

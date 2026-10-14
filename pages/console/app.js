@@ -175,7 +175,7 @@ $("probe").onclick = () => action($("probe"), async () => {
   await status(); notice(data.last_decision.reason === "judge_error" ? "连接测试失败，请查看历史记录中的错误码。" : "连接测试完成。", data.last_decision.reason === "judge_error");
 });
 $("refresh-status").onclick = () => action($("refresh-status"), status);
-$("refresh-history").onclick = () => action($("refresh-history"), () => history());
+$("refresh-history").onclick = () => action($("refresh-history"), async () => { await status(); await history(); });
 $("more-history").onclick = () => action($("more-history"), () => history(false));
 
 async function connect() {

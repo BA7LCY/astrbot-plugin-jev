@@ -375,9 +375,10 @@ async def test_follow_style_ignores_custom_gate_values(setup_engine):
 def test_chinese_aliases_normalize():
     cfg = Settings.load({"reply_style": "活泼", "busy_lock_scope": "全局"})
     assert (cfg.reply_style, cfg.busy_lock_scope) == ("sociable", "global")
-    # 旧配置里的英文值静默归一，面板不再提供英文选项。
-    assert Settings.load({"reply_style": "balanced"}).reply_style == "balanced"
-    assert Settings.load({"busy_lock_scope": "group"}).busy_lock_scope == "group"
+    with pytest.raises(ValueError):
+        Settings.load({"reply_style": "balanced"})  # 现在只认中文下拉值
+    with pytest.raises(ValueError):
+        Settings.load({"busy_lock_scope": "group"})
     with pytest.raises(ValueError):
         Settings.load({"reply_style": "吵闹"})
     with pytest.raises(ValueError):
@@ -445,6 +446,15 @@ def test_policy_overrides_replace_with_guard_and_fallback(tmp_path):
         Policy.parse({"guidance": "", "overrides": {"worthwhile": {"instructions": "{{unknown}}"}}})
     # 空字符串覆写等于未覆写
     assert Policy.parse({"guidance": "", "overrides": {"worthwhile": {"instructions": "  "}}}).overrides == {}
+
+
+def test_legacy_policy_migrates_without_warning():
+    legacy = {"pre_prompt": "别总提吃的", "post_prompt": ""}
+    policy = Policy.parse(legacy)
+    assert policy.guidance == "别总提吃的"
+    assert policy.overrides == {}
+    both = Policy.parse({"pre_prompt": "安静一点", "post_prompt": "不要重复"})
+    assert both.guidance == "安静一点\n不要重复"
 
 
 def test_policy_validation_and_atomic_persistence(tmp_path):
