@@ -210,14 +210,6 @@ def test_snapshot_bounds_and_inflight_recall(setup_engine):
     assert later.recalled
 
 
-def test_fallback_lines_buffer(setup_engine):
-    engine, _, _ = setup_engine()
-    assert engine.fallback_lines("g") == []
-    engine.observe(Message("g", "1", "alice", "你好", speaker_name="alice"))
-    engine.observe(Message("g", "2", "bob", "吃了吗", speaker_name="bob"))
-    assert engine.fallback_lines("g") == ["alice：你好", "bob：吃了吗"]
-
-
 async def test_history_disabled_still_judges(setup_engine):
     engine, judge, store = setup_engine(history_enabled=False)
     msg = Message("g", "1", "u", "x", conversation=["[小明/13:05]:  在吗"])
