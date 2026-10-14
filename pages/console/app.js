@@ -21,6 +21,8 @@ const reasons = {
   welcome_contribution: "值得插一句", uncertain_or_low_value: "不确定或不值得",
   inappropriate_draft: "草稿不合适", redundant_draft: "草稿重复", review_passed: "复核通过",
   stale_after_new_messages: "新消息让回复过时", freshness_passed: "时效通过",
+  no_questions: "题目已停用", addressed_worthwhile: "被点名且值得接",
+  addressed_not_worthwhile: "点名但没价值",
 };
 const stages = { pre: "接话", post: "复核", final: "时效", probe: "探针" };
 const labels = {
@@ -42,34 +44,51 @@ function buildOverrides() {
   for (const [key, label] of QUESTION_META) {
     const wrap = document.createElement("div"); wrap.className = "override";
     const title = document.createElement("label"); title.textContent = label;
+    const restore = document.createElement("button");
+    restore.type = "button"; restore.className = "quiet ov-restore"; restore.dataset.q = key; restore.textContent = "填入内置原文";
+    restore.onclick = () => putDefault(key, true);
     const ta = document.createElement("textarea"); ta.rows = 5; ta.dataset.q = key; ta.className = "ov-instructions";
-    const preset = defaultQuestions[key];
-    ta.value = preset ? preset.instructions : "";
-    ta.placeholder = "这里是内置题面原文；改成别的才会作为覆写保存";
+    ta.placeholder = "留空 = 这道题停用；默认启用 = 填带内置原文";
     const yes = document.createElement("input"); yes.className = "ov-true"; yes.dataset.q = key;
-    yes.value = (preset && preset.criteria.true) || "";
-    yes.placeholder = "算作「是」的标准"
+    yes.placeholder = "算作「是」的标准（留空用内置）";
     const no = document.createElement("input"); no.className = "ov-false"; no.dataset.q = key;
-    no.value = (preset && preset.criteria.false) || "";
-    no.placeholder = "算作「否」的标准";
-    wrap.append(title, ta, yes, no); box.append(wrap);
+    no.placeholder = "算作「否」的标准（留空用内置）";
+    wrap.append(title, restore, ta, yes, no); box.append(wrap);
+    putDefault(key, false);
+  }
+}
+function putDefault(key, force) {
+  const preset = defaultQuestions[key];
+  if (!preset) return;
+  const ta = document.querySelector(`.ov-instructions[data-q="${key}"]`);
+  const yes = document.querySelector(`.ov-true[data-q="${key}"]`);
+  const no = document.querySelector(`.ov-false[data-q="${key}"]`);
+  if (force || !ta.dataset.touched) {
+    ta.value = preset.instructions;
+    yes.value = preset.criteria.true || "";
+    no.value = preset.criteria.false || "";
   }
 }
 function draft() {
   const overrides = {};
   for (const ta of document.querySelectorAll(".ov-instructions")) {
     const key = ta.dataset.q;
-    let instructions = ta.value.trim();
     const preset = defaultQuestions[key] || {};
-    if (instructions === ((preset.instructions) || "").trim()) instructions = "";
+    const raw = ta.value.trim();
     const yes = document.querySelector(`.ov-true[data-q="${key}"]`).value.trim();
     const no = document.querySelector(`.ov-false[data-q="${key}"]`).value.trim();
     const entry = {};
-    if (instructions) entry.instructions = instructions;
-    const criteria = {};
-    if (yes && yes !== ((preset.criteria || {}).true || "").trim()) criteria.true = yes;
-    if (no && no !== ((preset.criteria || {}).false || "").trim()) criteria.false = no;
-    if (Object.keys(criteria).length) entry.criteria = criteria;
+    if (!raw) {
+      entry.enabled = false;
+    } else {
+      if (raw !== ((preset.instructions) || "").trim()) entry.instructions = raw;
+      const criteria = {};
+      const dftTrue = ((preset.criteria || {}).true || "").trim();
+      const dftFalse = ((preset.criteria || {}).false || "").trim();
+      if (yes && yes !== dftTrue) criteria.true = yes;
+      if (no && no !== dftFalse) criteria.false = no;
+      if (Object.keys(criteria).length) entry.criteria = criteria;
+    }
     if (Object.keys(entry).length) overrides[key] = entry;
   }
   return { guidance: $("guidance").value, overrides };

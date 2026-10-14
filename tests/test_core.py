@@ -8,7 +8,7 @@ from jev.client import JevError
 from jev.config import Settings
 from jev.engine import Engine, Message, render_line, render_scene
 from jev.history import History
-from jev.policy import Policy
+from jev.policy import Policy, decide_addressed
 
 
 ALLOW_INTAKE = {"addressed": 0.0, "continuation": 0.0, "worthwhile": 1.0, "intrusive": 0.0}
@@ -100,6 +100,19 @@ async def test_independent_switches(setup_engine):
     engine.settings = replace(engine.settings, recall_enabled=False)
     assert await engine.decide("post", msg, "reply")
     assert len(judge.calls) == 1
+
+
+async def test_addressed_judges_only_worthwhile(setup_engine):
+    engine, judge, store = setup_engine()
+    # 被 @ 只发一道值得题；judghe 给的 worthwhile 0.62 过 0.5 即放
+    judge.values = {"worthwhile": 0.62}
+    msg = Message("g", "1", "u", "x", addressed=True)
+    assert await engine.decide("pre", msg)
+    assert set(judge.calls[0][2]) == {"worthwhile"}
+    assert store.recent()[0]["reason"] == "addressed_worthwhile"
+    judge.values = {"worthwhile": 0.4}
+    assert not await engine.decide("pre", msg)
+    assert store.recent()[0]["reason"] == "addressed_not_worthwhile"
 
 
 async def test_addressed_bypasses_judgment_but_not_recall(setup_engine):
@@ -258,9 +271,12 @@ async def test_persona_follows_template(setup_engine):
         ({"addressed": 0.9, "continuation": 0.0, "worthwhile": 0.6, "intrusive": 0.3}, True, "implicit_address"),
         ({"addressed": 0.0, "continuation": 0.0, "worthwhile": 1.0, "intrusive": 0.0}, True, "welcome_contribution"),
         ({"addressed": 0.0, "continuation": 0.0, "worthwhile": 0.5, "intrusive": 0.0}, False, "uncertain_or_low_value"),
-        ({"addressed": 0.0, "continuation": 0.0, "worthwhile": 0.6}, False, "missing_judgment"),
+        ({"addressed": 0.0, "continuation": 0.0, "worthwhile": 0.6}, False, "uncertain_or_low_value"),
+        ({"continuation": 0.0, "worthwhile": 0.8}, True, "welcome_contribution"),
+        ({"intrusive": 0.5}, False, "intrusive"),
+        ({}, True, "no_questions"),
     ],
-    ids=["打断", "续话", "隐含点名", "值得", "不值得", "缺题"],
+    ids=["打断", "续话", "隐含点名", "值得", "不值得", "值得不够起评", "只有三题缺打扰", "只有打扰", "全停用"],
 )
 def test_intake_verdict_composition(values, expected_allowed, expected_reason):
     from jev.policy import decide_intake
@@ -280,7 +296,11 @@ def test_intake_style_threshold_and_review_freshness():
     assert decide_review({"still_fits": 0.4, "appropriate": 0.9, "redundant": 0.1}).reason == "stale_after_new_messages"
     assert decide_review({"still_fits": 0.9, "appropriate": 0.6, "redundant": 0.2}).reason == "inappropriate_draft"
     assert decide_review({"still_fits": 0.9, "appropriate": 0.9, "redundant": 0.6}).reason == "redundant_draft"
-    assert not decide_review({}).allowed
+    assert decide_review({}).allowed  # 全部题停用即放行
+    assert decide_review({"redundant": 0.9}).reason == "redundant_draft"  # 单题也能拦
+    assert decide_addressed({"worthwhile": 0.7}).allowed
+    assert decide_addressed({"worthwhile": 0.4}).reason == "addressed_not_worthwhile"
+    assert decide_addressed({}).reason == "no_questions"
 
 
 async def test_intake_gate_thresholds_are_configurable(setup_engine):
@@ -429,6 +449,11 @@ def test_policy_overrides_replace_with_guard_and_fallback(tmp_path):
     assert questions["worthwhile"]["criteria"] == INTAKE_QUESTIONS["worthwhile"]["criteria"]
     untouched = INTAKE_QUESTIONS["addressed"]["instructions"][:20]
     assert questions["addressed"]["instructions"].startswith(untouched)
+
+    # 覆写里 enabled: false 直接抽掉该题，任何阶段不再询问
+    policy = Policy(overrides={"worthwhile": {"enabled": False}})
+    assert "worthwhile" not in policy.questions("pre", "")
+    assert "worthwhile" not in policy.questions("post", "")
 
     policy = Policy(overrides={"worthwhile": {"criteria": {"true": "闲聊即为值得"}}})
     questions = policy.questions("pre", "")

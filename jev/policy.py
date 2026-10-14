@@ -39,7 +39,9 @@ INTAKE_QUESTIONS = {
     "worthwhile": question(
         "Would a short in-character response add something welcome here?",
         "Useful contribution, empathy, reaction, shared joke or meaningful follow-up. It need not be a question.",
-        "Repetitive advice, forced help, empty acknowledgment, repeating what others already said.",
+        "Repetitive advice, forced help, empty acknowledgment, repeating what others already said."
+        " A bare mention with no content, a repeated shout-out, or an insulting mention to this bot "
+        "is also not worth an answer.",
     ),
     "intrusive": question(
         "Would the bot replying now interrupt or annoy the participants?",
@@ -211,21 +213,45 @@ def decide_intake(
     addressed_threshold: float = ADDRESSED_MIN,
     worthwhile_min: float = WORTHWHILE_MIN,
 ) -> Verdict:
-    """把逐项概率合成要不要接话；档线参数与配置字段同名，避免引擎做一层映射。"""
-    if set(INTAKE_QUESTIONS) - values.keys():
-        return Verdict(False, "missing_judgment")
-    if values["intrusive"] >= intrusive_block_threshold:
+    """把逐项概率合成要不要接话；档线参数与配置字段同名，避免引擎做一层映射。
+
+    被控制台停用或调用方未询问的题不会出现在 values 里；缺失的题对应的所有闸门都跳过，
+    而不是当作非法。这与"留空 = 不用这题"的控制台语义保持一致。
+    """
+    if not values:
+        return Verdict(True, "no_questions")
+    intrusive = values.get("intrusive")
+    if intrusive is not None and intrusive >= intrusive_block_threshold:
         return Verdict(False, "intrusive")
-    if values["continuation"] >= continuation_threshold and values["worthwhile"] >= worthwhile_min:
+    continuation = values.get("continuation")
+    worthwhile = values.get("worthwhile")
+    if (
+        continuation is not None and continuation >= continuation_threshold
+        and worthwhile is not None and worthwhile >= worthwhile_min
+    ):
         return Verdict(True, "topic_continuation")
-    if values["addressed"] >= addressed_threshold and values["worthwhile"] >= worthwhile_min:
+    addressed = values.get("addressed")
+    if (
+        addressed is not None and addressed >= addressed_threshold
+        and worthwhile is not None and worthwhile >= worthwhile_min
+    ):
         return Verdict(True, "implicit_address")
     if (
-        values["worthwhile"] >= STYLE_BASE.get(style, 0.78)
-        and values["intrusive"] <= join_intrusion_ceiling
+        worthwhile is not None and worthwhile >= STYLE_BASE.get(style, 0.78)
+        and (intrusive is None or intrusive <= join_intrusion_ceiling)
     ):
         return Verdict(True, "welcome_contribution")
     return Verdict(False, "uncertain_or_low_value")
+
+
+def decide_addressed(values: dict, worthwhile_min: float = WORTHWHILE_MIN) -> Verdict:
+    """被 @ 的消息只问「这项内容值不值得回」一题；该题已被停用时直接放行。"""
+    worthwhile = values.get("worthwhile")
+    if worthwhile is None:
+        return Verdict(True, "no_questions")
+    if worthwhile < worthwhile_min:
+        return Verdict(False, "addressed_not_worthwhile")
+    return Verdict(True, "addressed_worthwhile")
 
 
 def decide_review(
@@ -234,14 +260,14 @@ def decide_review(
     review_appropriate_min: float = REVIEW_APPROPRIATE_MIN,
     review_redundant_max: float = REVIEW_REDUNDANT_MAX,
 ) -> Verdict:
-    """发送复核：时效还在且合适过线且重复不超标才放行。三条档线都可出配置覆盖。"""
-    if set(REVIEW_QUESTIONS) - values.keys():
-        return Verdict(False, "missing_judgment")
-    if values["still_fits"] < review_freshness_min:
+    """发送复核：任一在问的题不过线就拦；被停用的题不参与决策。"""
+    if not values:
+        return Verdict(True, "no_questions")
+    if "still_fits" in values and values["still_fits"] < review_freshness_min:
         return Verdict(False, "stale_after_new_messages")
-    if values["appropriate"] < review_appropriate_min:
+    if "appropriate" in values and values["appropriate"] < review_appropriate_min:
         return Verdict(False, "inappropriate_draft")
-    if values["redundant"] > review_redundant_max:
+    if "redundant" in values and values["redundant"] > review_redundant_max:
         return Verdict(False, "redundant_draft")
     return Verdict(True, "review_passed")
 
@@ -336,9 +362,14 @@ class Policy:
         for name, item in values.items():
             if name not in ALL_QUESTION_NAMES:
                 raise ValueError(f"未知题目: {name}")
-            if not isinstance(item, dict) or not set(item) <= {"instructions", "criteria"}:
-                raise ValueError(f"题目 {name} 的覆写只允许 instructions 与 criteria")
+            if not isinstance(item, dict) or not set(item) <= {"instructions", "criteria", "enabled"}:
+                raise ValueError(f"题目 {name} 的覆写只允许 instructions、criteria、enabled")
             entry = {}
+            enabled = item.get("enabled")
+            if enabled is not None and enabled is not True and enabled is not False:
+                raise ValueError(f"题目 {name} 的 enabled 只能是 true 或 false")
+            if enabled is False:
+                entry["enabled"] = False
             instructions = item.get("instructions")
             if instructions is not None:
                 if not isinstance(instructions, str) or len(instructions.strip()) > 4000:
@@ -374,9 +405,13 @@ class Policy:
         """
         guidance = self.render(stage, persona).strip()
         result = stage_questions(stage)
-        for name, item in result.items():
+        for name, item in list(result.items()):
             override = self.overrides.get(name)
             if override:
+                if override.get("enabled") is False:
+                    # 明确停用：这道题从本次请求中移除，不参与提问也不参与合成。
+                    result.pop(name)
+                    continue
                 text = override.get("instructions")
                 if text is not None:
                     # 覆写题面后强制拼回防注入句，操作员不能剥离这道护栏。

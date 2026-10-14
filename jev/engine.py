@@ -16,6 +16,7 @@ from .policy import (
     GATE_FIELDS,
     STYLE_PRESETS,
     Policy,
+    decide_addressed,
     decide_intake,
     decide_review,
 )
@@ -308,40 +309,52 @@ class Engine:
         elif stage == "probe" or (
             cfg.pre_check_enabled if stage == "pre" else cfg.post_check_enabled
         ):
-            try:
-                result = await self.judge.evaluate(state, stage, record["questions"])
-                record.update(result)
-                values = result["values"]
-                gates = self.gates()
-                if stage in ("pre", "probe"):
-                    verdict = decide_intake(
-                        values,
-                        cfg.reply_style,
-                        **{k: gates[k] for k in (
-                            "intrusive_block_threshold",
-                            "join_intrusion_ceiling",
-                            "continuation_threshold",
-                            "addressed_threshold",
-                            "worthwhile_min",
-                        )},
+            questions = record["questions"]
+            if stage == "pre" and message.addressed:
+                # 被 @ 只问「值得」一题；题被停用时整个预判断变零题放行。
+                worthwhile = questions.get("worthwhile")
+                questions = {"worthwhile": worthwhile} if worthwhile else {}
+                record["questions"] = questions
+            if not questions:
+                # 该阶段没有任何题：本次零判放行（含被 @ 且「值得」题已停用的情况）。
+                record.update(allowed=True, reason="no_questions")
+            else:
+                try:
+                    result = await self.judge.evaluate(state, stage, questions)
+                    record.update(result)
+                    values = result["values"]
+                    gates = self.gates()
+                    if stage == "pre" and message.addressed:
+                        verdict = decide_addressed(values, gates["worthwhile_min"])
+                    elif stage in ("pre", "probe"):
+                        verdict = decide_intake(
+                            values,
+                            cfg.reply_style,
+                            **{k: gates[k] for k in (
+                                "intrusive_block_threshold",
+                                "join_intrusion_ceiling",
+                                "continuation_threshold",
+                                "addressed_threshold",
+                                "worthwhile_min",
+                            )},
+                        )
+                    else:
+                        verdict = decide_review(
+                            values,
+                            **{k: gates[k] for k in (
+                                "review_freshness_min",
+                                "review_appropriate_min",
+                                "review_redundant_max",
+                            )},
+                        )
+                    record.update(allowed=verdict.allowed, reason=verdict.reason)
+                    if cfg.dry_run_enabled and not verdict.allowed:
+                        # 影子模式：记录“本会拦截”，实际放行，只有撤回硬规则不受影响。
+                        record.update(dry_run=True, computed_allowed=False, allowed=True)
+                except JevError as error:
+                    record.update(
+                        allowed=cfg.fail_open, reason="judge_error", error=str(error)
                     )
-                else:
-                    verdict = decide_review(
-                        values,
-                        **{k: gates[k] for k in (
-                            "review_freshness_min",
-                            "review_appropriate_min",
-                            "review_redundant_max",
-                        )},
-                    )
-                record.update(allowed=verdict.allowed, reason=verdict.reason)
-                if cfg.dry_run_enabled and not verdict.allowed:
-                    # 影子模式：记录“本会拦截”，实际放行，只有撤回硬规则不受影响。
-                    record.update(dry_run=True, computed_allowed=False, allowed=True)
-            except JevError as error:
-                record.update(
-                    allowed=cfg.fail_open, reason="judge_error", error=str(error)
-                )
             if cfg.recall_enabled and message.recalled:
                 record.update(allowed=False, reason="recalled_during_check")
         record["elapsed_ms"] = round((time.monotonic() - start) * 1000, 1)
