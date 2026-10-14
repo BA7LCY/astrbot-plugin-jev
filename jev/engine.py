@@ -122,6 +122,7 @@ class Engine:
         self.live: weakref.WeakValueDictionary = weakref.WeakValueDictionary()
         self.burst: OrderedDict[str, int] = OrderedDict()
         self.last_spoke: dict[str, float] = {}
+        self.recent_lines: OrderedDict[str, list] = OrderedDict()
         self.burst: OrderedDict[str, int] = OrderedDict()
         self.last_decision: dict | None = None
         self.history_error = False
@@ -197,7 +198,14 @@ class Engine:
         if message.role == "assistant":
             self.remember(self.last_replies, message.session, render_line(message, {}))
             self.mark_spoke(message.session)
-        else:
+        lines = self.recent_lines.setdefault(message.session, [])
+        lines.append(render_line(message, {}))
+        if len(lines) > 20:
+            del lines[:-20]
+        self.recent_lines.move_to_end(message.session)
+        while len(self.recent_lines) > MAX_SNAPSHOTS:
+            self.recent_lines.popitem(last=False)
+        if message.role == "user":
             self.remember(
                 self.personas,
                 message.session,
@@ -205,6 +213,10 @@ class Engine:
                     message.persona, message.persona_id, message.persona_status
                 ),
             )
+
+    def fallback_lines(self, session: str) -> list[str]:
+        """宿主没有给出群聊记录时的兜底：引擎在被接管会话里自己攒的最近消息。"""
+        return list(self.recent_lines.get(session, ()))
 
     def recall(self, session: str, message_id: str) -> None:
         """同步标记撤回，避免被后续限流或异步处理阻塞。

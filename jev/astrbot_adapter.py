@@ -265,9 +265,12 @@ class AstrBotAdapter:
             speaker_name=""
             if private
             else str(event.message_obj.sender.nickname or ""),
-            conversation=await self.host_history_lines(event)
-            if private
-            else self.host_group_lines(event),
+            conversation=(
+                await self.host_history_lines(event)
+                if private
+                else self.host_group_lines(event)
+            )
+            or self.engine.fallback_lines(session_key),
         )
         event.set_extra("jev_message", message)
         self.engine.observe(message)
