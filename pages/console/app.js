@@ -32,10 +32,10 @@ function notice(text, error = false) {
   $("notice").classList.toggle("error", error);
 }
 const QUESTION_META = [
-  ["addressed", "接话 · 是不是在叫我"], ["continuation", "接话 · 是不是接着刚才的话茬"],
-  ["worthwhile", "接话 · 值得开口吗"], ["intrusive", "接话 · 会不会打断别人"],
-  ["still_fits", "复核 · 草稿还合时宜吗"], ["appropriate", "复核 · 草稿合适吗"],
-  ["redundant", "复核 · 草稿重复吗"],
+  ["addressed", "接话 · 是不是在叫我 (addressed)"], ["continuation", "接话 · 是不是接着刚才的话茬 (continuation)"],
+  ["worthwhile", "接话 · 值得开口吗 (worthwhile)"], ["intrusive", "接话 · 会不会打断别人 (intrusive)"],
+  ["still_fits", "复核 · 草稿还合时宜吗 (still_fits)"], ["appropriate", "复核 · 草稿合适吗 (appropriate)"],
+  ["redundant", "复核 · 草稿重复吗 (redundant)"],
 ];
 function buildOverrides() {
   const box = $("overrides");
