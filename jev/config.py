@@ -74,7 +74,7 @@ class Settings:
     pre_check_enabled: bool = True
     post_check_enabled: bool = True
     recall_enabled: bool = True
-    gates_follow_style: bool = True
+    custom_gates_enabled: bool = False
 
     burst_merge_enabled: bool = False
     dry_run_enabled: bool = False
@@ -119,6 +119,10 @@ class Settings:
             ValueError: 配置类型、范围或鉴权设置不合法。
         """
         defaults = cls()
+        if "custom_gates_enabled" not in values and "gates_follow_style" in values:
+            # 老字段取反迁移：跟随开启=自定义关闭。
+            values = dict(values)
+            values["custom_gates_enabled"] = not values["gates_follow_style"]
         nested = values.get("custom_gates")
         if nested is not None:
             if not isinstance(nested, dict):

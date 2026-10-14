@@ -284,7 +284,7 @@ def test_intake_style_threshold_and_review_freshness():
 
 
 async def test_intake_gate_thresholds_are_configurable(setup_engine):
-    engine, judge, store = setup_engine(gates_follow_style=False)
+    engine, judge, store = setup_engine(custom_gates_enabled=True)
     judge.values = {
         "addressed": 0.0, "continuation": 0.55,
         "worthwhile": 0.6, "intrusive": 0.25,
@@ -335,7 +335,7 @@ async def test_reply_cooldown_tracks_spoke(setup_engine):
 
 
 async def test_all_gate_thresholds_configurable(setup_engine):
-    engine, judge, store = setup_engine(gates_follow_style=False)
+    engine, judge, store = setup_engine(custom_gates_enabled=True)
     judge.values = {
         "addressed": 0.6, "continuation": 0.0,
         "worthwhile": 0.45, "intrusive": 0.1,
@@ -367,7 +367,7 @@ async def test_follow_style_ignores_custom_gate_values(setup_engine):
     # balanced 预设的拦截线是 0.45，0.5 分即使自定义 0.99 也照样拦
     # 跟随预设：balanced 拦截线 0.45，0.5 分照样拦，不管用户自填的 0.99
     assert not await engine.decide("pre", msg)
-    engine.settings = replace(engine.settings, gates_follow_style=False)
+    engine.settings = replace(engine.settings, custom_gates_enabled=True)
     # 自定义：打扰上限 0.99、拦截线 0.99 → 落到「值得插一句」放通
     assert await engine.decide("pre", msg)
 
@@ -480,6 +480,15 @@ def test_history_retention_and_pagination(tmp_path):
     assert [item["number"] for item in first] == [5, 4]
     assert store.recent(before=first[-1]["id"])[0]["number"] == 3
     assert len(History(store.path, 3).recent()) == 3
+
+
+def test_legacy_gates_key_migrates():
+    assert not Settings.load({"gates_follow_style": True}).custom_gates_enabled
+    assert Settings.load({"gates_follow_style": False}).custom_gates_enabled
+    # 新键优先，老键不反向覆盖
+    assert not Settings.load(
+        {"gates_follow_style": False, "custom_gates_enabled": False}
+    ).custom_gates_enabled
 
 
 def test_legacy_threshold_key_is_ignored():

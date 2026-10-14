@@ -135,11 +135,11 @@ class Engine:
         )
 
     def gates(self) -> dict:
-        """本轮判断使用的八条档线；跟随开关开时用风格预设，关闭时用用户自填。"""
+        """本轮判断用的八条档线；自定义闸门开关开了用用户自填，否则用参与程度预设。"""
         cfg = self.settings
-        if cfg.gates_follow_style:
-            return dict(STYLE_PRESETS.get(cfg.reply_style, STYLE_PRESETS["balanced"]))
-        return {name: getattr(cfg, name) for name in GATE_FIELDS}
+        if cfg.custom_gates_enabled:
+            return {name: getattr(cfg, name) for name in GATE_FIELDS}
+        return dict(STYLE_PRESETS.get(cfg.reply_style, STYLE_PRESETS["balanced"]))
 
     @staticmethod
     def remember(store: OrderedDict, key: str, value) -> None:
