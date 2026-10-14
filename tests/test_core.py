@@ -374,16 +374,6 @@ async def test_follow_style_ignores_custom_gate_values(setup_engine):
 def test_chinese_aliases_normalize():
     cfg = Settings.load({"reply_style": "活泼", "busy_lock_scope": "全局"})
     assert (cfg.reply_style, cfg.busy_lock_scope) == ("sociable", "global")
-    # 折叠卡片（template_list）存的是列表，插件取第一张卡片摊平
-    card = {
-        "custom_gates": [
-            {"__template_key": "gates", "intrusive_block_threshold": 0.2}
-        ]
-    }
-    loaded = Settings.load(card)
-    assert loaded.intrusive_block_threshold == 0.2
-    # 空列表（从未添加卡片）不报错
-    assert not Settings.load({"custom_gates": []}).custom_gates_enabled
     # 废弃或写错的值不再让插件起不来：自动落到该档默认码；面板只提供中文选项。
     assert Settings.load({"reply_style": "balanced"}).reply_style == "balanced"
     assert Settings.load({"busy_lock_scope": "group"}).busy_lock_scope == "group"
@@ -574,11 +564,10 @@ def test_config_schema_matches_defaults():
     )
     flat = {}
     for key, value in schema.items():
-        if value.get("type") == "template_list":
-            # 折叠卡片在插件侧取第一个卡片摊平成顶层字段；唯一模板的项默认值要和 Settings 对齐。
-            template = next(iter(value["templates"].values()))
+        if value.get("type") == "object":
+            # 折叠组在插件侧摊平成顶层字段，逐项和 Settings 默认值对齐。
             flat.update(
-                {sub: item["default"] for sub, item in template["items"].items()}
+                {sub: item["default"] for sub, item in value["items"].items()}
             )
         else:
             flat[key] = value["default"]

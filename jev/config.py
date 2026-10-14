@@ -120,14 +120,6 @@ class Settings:
             values = dict(values)
             values["custom_gates_enabled"] = not values["gates_follow_style"]
         nested = values.get("custom_gates")
-        if isinstance(nested, list):
-            # 面板折叠卡片以 template_list 存储（也就是一个实例列表），取第一个条目
-            candidates = (item for item in nested if isinstance(item, dict))
-            instance = next(candidates, None)
-            if instance is not None:
-                nested = {k: v for k, v in instance.items() if k != "__template_key"}
-            else:
-                nested = None
         if nested is not None:
             if not isinstance(nested, dict):
                 raise ValueError("Invalid setting: custom_gates")
