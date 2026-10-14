@@ -1,7 +1,6 @@
 """结构化判断题库与放行合成规则；聊天偏好只作为附加说明拼接到每道题末尾。
 
-题目本体与合成档线固定，不暴露裸概率门槛给操作员；档线取值与
-astrbot_plugin_jev_active_reply 的内置默认对齐。
+题目本体与合成档线固定，不暴露裸概率门槛给操作员。
 """
 
 import json
@@ -80,7 +79,7 @@ REVIEW_QUESTIONS = {
 
 
 
-# 合成档线：与 active_reply 的内置默认一致，一律不进用户配置。
+# 合成档线在此内置；不暴露裸概率门槛给操作员。
 REVIEW_APPROPRIATE_MIN = 0.75
 REVIEW_REDUNDANT_MAX = 0.35
 FRESHNESS_MIN = 0.5
@@ -279,7 +278,7 @@ def decide_review(
 class Policy:
     """一条可编辑的聊天偏好；追加到该阶段每一道题末尾，留空则不追加。
 
-    对应 active_reply 的 behavior_guidance 配置项；题面本体默认内置，允许逐题覆写，
+    题面本体默认内置，允许逐题覆写，
     防注入句由本层强制拼回、不可删除。
 
     Attributes:
