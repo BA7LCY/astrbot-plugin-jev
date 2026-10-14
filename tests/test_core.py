@@ -375,8 +375,9 @@ async def test_follow_style_ignores_custom_gate_values(setup_engine):
 def test_chinese_aliases_normalize():
     cfg = Settings.load({"reply_style": "活泼", "busy_lock_scope": "全局"})
     assert (cfg.reply_style, cfg.busy_lock_scope) == ("sociable", "global")
-    with pytest.raises(ValueError):
-        Settings.load({"reply_style": "balanced"})  # 不认英文直填
+    # 旧配置里的英文值静默归一，面板不再提供英文选项。
+    assert Settings.load({"reply_style": "balanced"}).reply_style == "balanced"
+    assert Settings.load({"busy_lock_scope": "group"}).busy_lock_scope == "group"
     with pytest.raises(ValueError):
         Settings.load({"reply_style": "吵闹"})
     with pytest.raises(ValueError):
