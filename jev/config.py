@@ -52,10 +52,13 @@ STYLE_ALIASES = {"安静": "quiet", "平衡": "balanced", "活泼": "sociable"}
 SCOPE_ALIASES = {"同群": "group", "同人": "sender", "全局": "global"}
 
 
-def alias(value, table: dict, name: str) -> str:
-    """把面板上的中文选项归一成内部英文码；非法值直接报错。"""
+def alias(value, table: dict, name: str, default: str) -> str:
+    """把面板上的中文选项归一成内部英文码。
+
+    历史原因留下的非法或已废值不让整个插件起不来，落到默认值并从星标警告里看得出。
+    """
     if not isinstance(value, str) or value.strip() not in table:
-        raise ValueError(f"Invalid setting: {name}")
+        return default
     return table[value.strip()]
 
 
@@ -146,8 +149,12 @@ class Settings:
                 )
             data[field.name] = value
         data["api_base"] = normalize_api_base(data["api_base"])
-        data["busy_lock_scope"] = alias(data["busy_lock_scope"], SCOPE_ALIASES, "busy_lock_scope")
-        data["reply_style"] = alias(data["reply_style"], STYLE_ALIASES, "reply_style")
+        data["busy_lock_scope"] = alias(
+            data["busy_lock_scope"], SCOPE_ALIASES, "busy_lock_scope", "group"
+        )
+        data["reply_style"] = alias(
+            data["reply_style"], STYLE_ALIASES, "reply_style", "balanced"
+        )
         result = cls(**data)
         ranges = {
             "timeout_seconds": (0.1, 60),

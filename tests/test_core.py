@@ -364,7 +364,6 @@ async def test_follow_style_ignores_custom_gate_values(setup_engine):
         "worthwhile": 0.9, "intrusive": 0.5,
     }
     msg = Message("g", "1", "u", "x")
-    # balanced 预设的拦截线是 0.45，0.5 分即使自定义 0.99 也照样拦
     # 跟随预设：balanced 拦截线 0.45，0.5 分照样拦，不管用户自填的 0.99
     assert not await engine.decide("pre", msg)
     engine.settings = replace(engine.settings, custom_gates_enabled=True)
@@ -375,14 +374,11 @@ async def test_follow_style_ignores_custom_gate_values(setup_engine):
 def test_chinese_aliases_normalize():
     cfg = Settings.load({"reply_style": "活泼", "busy_lock_scope": "全局"})
     assert (cfg.reply_style, cfg.busy_lock_scope) == ("sociable", "global")
-    with pytest.raises(ValueError):
-        Settings.load({"reply_style": "balanced"})  # 现在只认中文下拉值
-    with pytest.raises(ValueError):
-        Settings.load({"busy_lock_scope": "group"})
-    with pytest.raises(ValueError):
-        Settings.load({"reply_style": "吵闹"})
-    with pytest.raises(ValueError):
-        Settings.load({"busy_lock_scope": "独自"})
+    # 废弃或写错的值不再让插件起不来：自动落到该档默认码；面板只提供中文选项。
+    assert Settings.load({"reply_style": "balanced"}).reply_style == "balanced"
+    assert Settings.load({"busy_lock_scope": "group"}).busy_lock_scope == "group"
+    assert Settings.load({"reply_style": "吵闹"}).reply_style == "balanced"
+    assert Settings.load({"busy_lock_scope": "独自"}).busy_lock_scope == "group"
 
 
 async def test_final_stage_is_recall_only(setup_engine):
