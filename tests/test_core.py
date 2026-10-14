@@ -376,6 +376,8 @@ def test_chinese_aliases_normalize():
     cfg = Settings.load({"reply_style": "活泼", "busy_lock_scope": "全局"})
     assert (cfg.reply_style, cfg.busy_lock_scope) == ("sociable", "global")
     with pytest.raises(ValueError):
+        Settings.load({"reply_style": "balanced"})  # 不认英文直填
+    with pytest.raises(ValueError):
         Settings.load({"reply_style": "吵闹"})
     with pytest.raises(ValueError):
         Settings.load({"busy_lock_scope": "独自"})
@@ -539,9 +541,16 @@ def test_config_schema_matches_defaults():
     schema = json.loads(
         (Path(__file__).parents[1] / "_conf_schema.json").read_text(encoding="utf-8")
     )
-    assert {key: value["default"] for key, value in schema.items()} == asdict(
-        Settings()
-    )
+    flat = {}
+    for key, value in schema.items():
+        if value.get("type") == "object":
+            # 折叠组在插件侧摊平成顶层字段，逐项和 Settings 默认值对齐。
+            flat.update(
+                {sub: item["default"] for sub, item in value["items"].items()}
+            )
+        else:
+            flat[key] = value["default"]
+    assert flat == asdict(Settings())
 
 
 async def test_storage_failure_does_not_break_gate(setup_engine):

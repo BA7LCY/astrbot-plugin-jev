@@ -48,14 +48,8 @@ def normalize_api_base(value: str) -> str:
     return base
 
 
-STYLE_ALIASES = {
-    "quiet": "quiet", "balanced": "balanced", "sociable": "sociable",
-    "安静": "quiet", "平衡": "balanced", "活泼": "sociable",
-}
-SCOPE_ALIASES = {
-    "group": "group", "sender": "sender", "global": "global",
-    "同群": "group", "同人": "sender", "全局": "global",
-}
+STYLE_ALIASES = {"安静": "quiet", "平衡": "balanced", "活泼": "sociable"}
+SCOPE_ALIASES = {"同群": "group", "同人": "sender", "全局": "global"}
 
 
 def alias(value, table: dict, name: str) -> str:
@@ -118,6 +112,12 @@ class Settings:
             ValueError: 配置类型、范围或鉴权设置不合法。
         """
         defaults = cls()
+        nested = values.get("custom_gates")
+        if nested is not None:
+            if not isinstance(nested, dict):
+                raise ValueError("Invalid setting: custom_gates")
+            # 面板把自定义档线收成折叠组，在对象里；读配置时摊平回顶层。
+            values = {**values, **nested}
         data = {}
         for field in fields(cls):
             default = getattr(defaults, field.name)
