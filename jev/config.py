@@ -48,6 +48,23 @@ def normalize_api_base(value: str) -> str:
     return base
 
 
+STYLE_ALIASES = {
+    "quiet": "quiet", "balanced": "balanced", "sociable": "sociable",
+    "安静": "quiet", "平衡": "balanced", "活泼": "sociable",
+}
+SCOPE_ALIASES = {
+    "group": "group", "sender": "sender", "global": "global",
+    "同群": "group", "同人": "sender", "全局": "global",
+}
+
+
+def alias(value, table: dict, name: str) -> str:
+    """把面板上的中文选项归一成内部英文码；非法值直接报错。"""
+    if not isinstance(value, str) or value.strip() not in table:
+        raise ValueError(f"Invalid setting: {name}")
+    return table[value.strip()]
+
+
 @dataclass(frozen=True)
 class Settings:
     enabled: bool = False
@@ -56,6 +73,7 @@ class Settings:
     pre_check_enabled: bool = True
     post_check_enabled: bool = True
     recall_enabled: bool = True
+    gates_follow_style: bool = True
 
     burst_merge_enabled: bool = False
     dry_run_enabled: bool = False
@@ -64,8 +82,8 @@ class Settings:
     bypass_addressed: bool = False
     bypass_addressed_whitelist: list[str] = field(default_factory=list)
     busy_lock_enabled: bool = True
-    busy_lock_scope: str = "group"
-    reply_style: str = "balanced"
+    busy_lock_scope: str = "同群"
+    reply_style: str = "平衡"
     burst_window_seconds: float = 1.5
     reply_cooldown_seconds: float = 0.0
     intrusive_block_threshold: float = 0.45
@@ -124,9 +142,9 @@ class Settings:
                 )
             data[field.name] = value
         data["api_base"] = normalize_api_base(data["api_base"])
+        data["busy_lock_scope"] = alias(data["busy_lock_scope"], SCOPE_ALIASES, "busy_lock_scope")
+        data["reply_style"] = alias(data["reply_style"], STYLE_ALIASES, "reply_style")
         result = cls(**data)
-        if result.busy_lock_scope not in ("group", "global", "sender"):
-            raise ValueError("Invalid setting: busy_lock_scope")
         ranges = {
             "timeout_seconds": (0.1, 60),
 
@@ -149,6 +167,4 @@ class Settings:
                 raise ValueError(f"Out-of-range setting: {name}")
         if not result.model.strip():
             raise ValueError("Empty model")
-        if result.reply_style not in ("quiet", "balanced", "sociable"):
-            raise ValueError("Invalid setting: reply_style")
         return result

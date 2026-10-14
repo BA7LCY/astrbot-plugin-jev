@@ -11,6 +11,8 @@ const names = {
   bypass_commands: "命令旁路", bypass_addressed: "@跳过判断", fail_open: "故障放行",
   busy_lock_enabled: "回复中按住",
   burst_merge_enabled: "合并窗口", dry_run_enabled: "影子模式",
+  gates_follow_style: "闸门跟随参与程度",
+  gates_follow_style: "闸门跟随风格",
 };
 const reasons = {
   threshold: "概率阈值", recalled: "原消息已撤回", addressed_bypass: "被@直接放行",

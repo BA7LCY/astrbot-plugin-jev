@@ -89,6 +89,51 @@ WORTHWHILE_MIN = 0.50
 JOIN_INTRUSION_CEILING = 0.20
 STYLE_BASE = {"quiet": 0.86, "balanced": 0.78, "sociable": 0.70}
 
+GATE_FIELDS = (
+    "intrusive_block_threshold",
+    "join_intrusion_ceiling",
+    "continuation_threshold",
+    "addressed_threshold",
+    "worthwhile_min",
+    "review_appropriate_min",
+    "review_redundant_max",
+    "review_freshness_min",
+)
+
+# 每档参与的预设闸门值；"闸门跟随参与程度"开启时引擎用这套，关闭时用用户自填的数字。
+STYLE_PRESETS = {
+    "quiet": {
+        "intrusive_block_threshold": 0.38,
+        "join_intrusion_ceiling": 0.12,
+        "continuation_threshold": 0.78,
+        "addressed_threshold": 0.86,
+        "worthwhile_min": 0.56,
+        "review_appropriate_min": 0.80,
+        "review_redundant_max": 0.25,
+        "review_freshness_min": 0.55,
+    },
+    "balanced": {
+        "intrusive_block_threshold": INTRUSIVE_MAX,
+        "join_intrusion_ceiling": JOIN_INTRUSION_CEILING,
+        "continuation_threshold": CONTINUATION_MIN,
+        "addressed_threshold": ADDRESSED_MIN,
+        "worthwhile_min": WORTHWHILE_MIN,
+        "review_appropriate_min": REVIEW_APPROPRIATE_MIN,
+        "review_redundant_max": REVIEW_REDUNDANT_MAX,
+        "review_freshness_min": FRESHNESS_MIN,
+    },
+    "sociable": {
+        "intrusive_block_threshold": 0.55,
+        "join_intrusion_ceiling": 0.35,
+        "continuation_threshold": 0.55,
+        "addressed_threshold": 0.70,
+        "worthwhile_min": 0.42,
+        "review_appropriate_min": 0.70,
+        "review_redundant_max": 0.45,
+        "review_freshness_min": 0.45,
+    },
+}
+
 
 ALL_QUESTION_NAMES = frozenset(INTAKE_QUESTIONS) | frozenset(REVIEW_QUESTIONS)
 
@@ -125,20 +170,20 @@ class Verdict:
 def decide_intake(
     values: dict,
     style: str,
-    intrusive_max: float = INTRUSIVE_MAX,
+    intrusive_block_threshold: float = INTRUSIVE_MAX,
     join_intrusion_ceiling: float = JOIN_INTRUSION_CEILING,
-    continuation_min: float = CONTINUATION_MIN,
-    addressed_min: float = ADDRESSED_MIN,
+    continuation_threshold: float = CONTINUATION_MIN,
+    addressed_threshold: float = ADDRESSED_MIN,
     worthwhile_min: float = WORTHWHILE_MIN,
 ) -> Verdict:
-    """把逐项概率合成要不要接话；规则移植自 active_reply 的 decide，三个档线可由配置覆盖。"""
+    """把逐项概率合成要不要接话；档线参数与配置字段同名，避免引擎做一层映射。"""
     if set(INTAKE_QUESTIONS) - values.keys():
         return Verdict(False, "missing_judgment")
-    if values["intrusive"] >= intrusive_max:
+    if values["intrusive"] >= intrusive_block_threshold:
         return Verdict(False, "intrusive")
-    if values["continuation"] >= continuation_min and values["worthwhile"] >= worthwhile_min:
+    if values["continuation"] >= continuation_threshold and values["worthwhile"] >= worthwhile_min:
         return Verdict(True, "topic_continuation")
-    if values["addressed"] >= addressed_min and values["worthwhile"] >= worthwhile_min:
+    if values["addressed"] >= addressed_threshold and values["worthwhile"] >= worthwhile_min:
         return Verdict(True, "implicit_address")
     if (
         values["worthwhile"] >= STYLE_BASE.get(style, 0.78)
@@ -150,18 +195,18 @@ def decide_intake(
 
 def decide_review(
     values: dict,
-    freshness_min: float = FRESHNESS_MIN,
-    appropriate_min: float = REVIEW_APPROPRIATE_MIN,
-    redundant_max: float = REVIEW_REDUNDANT_MAX,
+    review_freshness_min: float = FRESHNESS_MIN,
+    review_appropriate_min: float = REVIEW_APPROPRIATE_MIN,
+    review_redundant_max: float = REVIEW_REDUNDANT_MAX,
 ) -> Verdict:
     """发送复核：时效还在且合适过线且重复不超标才放行。三条档线都可出配置覆盖。"""
     if set(REVIEW_QUESTIONS) - values.keys():
         return Verdict(False, "missing_judgment")
-    if values["still_fits"] < freshness_min:
+    if values["still_fits"] < review_freshness_min:
         return Verdict(False, "stale_after_new_messages")
-    if values["appropriate"] < appropriate_min:
+    if values["appropriate"] < review_appropriate_min:
         return Verdict(False, "inappropriate_draft")
-    if values["redundant"] > redundant_max:
+    if values["redundant"] > review_redundant_max:
         return Verdict(False, "redundant_draft")
     return Verdict(True, "review_passed")
 

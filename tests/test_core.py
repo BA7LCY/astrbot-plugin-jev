@@ -284,7 +284,7 @@ def test_intake_style_threshold_and_review_freshness():
 
 
 async def test_intake_gate_thresholds_are_configurable(setup_engine):
-    engine, judge, store = setup_engine()
+    engine, judge, store = setup_engine(gates_follow_style=False)
     judge.values = {
         "addressed": 0.0, "continuation": 0.55,
         "worthwhile": 0.6, "intrusive": 0.25,
@@ -335,7 +335,7 @@ async def test_reply_cooldown_tracks_spoke(setup_engine):
 
 
 async def test_all_gate_thresholds_configurable(setup_engine):
-    engine, judge, store = setup_engine()
+    engine, judge, store = setup_engine(gates_follow_style=False)
     judge.values = {
         "addressed": 0.6, "continuation": 0.0,
         "worthwhile": 0.45, "intrusive": 0.1,
@@ -353,6 +353,32 @@ async def test_all_gate_thresholds_configurable(setup_engine):
         engine.settings, review_appropriate_min=0.6, review_redundant_max=0.5
     )
     assert await engine.decide("post", msg, "reply")
+
+
+async def test_follow_style_ignores_custom_gate_values(setup_engine):
+    engine, judge, _ = setup_engine(
+        intrusive_block_threshold=0.99, join_intrusion_ceiling=0.99
+    )
+    judge.values = {
+        "addressed": 0.0, "continuation": 0.0,
+        "worthwhile": 0.9, "intrusive": 0.5,
+    }
+    msg = Message("g", "1", "u", "x")
+    # balanced 预设的拦截线是 0.45，0.5 分即使自定义 0.99 也照样拦
+    # 跟随预设：balanced 拦截线 0.45，0.5 分照样拦，不管用户自填的 0.99
+    assert not await engine.decide("pre", msg)
+    engine.settings = replace(engine.settings, gates_follow_style=False)
+    # 自定义：打扰上限 0.99、拦截线 0.99 → 落到「值得插一句」放通
+    assert await engine.decide("pre", msg)
+
+
+def test_chinese_aliases_normalize():
+    cfg = Settings.load({"reply_style": "活泼", "busy_lock_scope": "全局"})
+    assert (cfg.reply_style, cfg.busy_lock_scope) == ("sociable", "global")
+    with pytest.raises(ValueError):
+        Settings.load({"reply_style": "吵闹"})
+    with pytest.raises(ValueError):
+        Settings.load({"busy_lock_scope": "独自"})
 
 
 async def test_final_stage_is_recall_only(setup_engine):

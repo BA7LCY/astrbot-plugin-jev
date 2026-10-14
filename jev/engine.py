@@ -13,6 +13,8 @@ from .client import JevError
 from .config import Settings
 from .history import History
 from .policy import (
+    GATE_FIELDS,
+    STYLE_PRESETS,
     Policy,
     decide_intake,
     decide_review,
@@ -131,6 +133,13 @@ class Engine:
         return self.settings.enabled and (
             self.settings.private_enabled if private else self.settings.group_enabled
         )
+
+    def gates(self) -> dict:
+        """本轮判断使用的八条档线；跟随开关开时用风格预设，关闭时用用户自填。"""
+        cfg = self.settings
+        if cfg.gates_follow_style:
+            return dict(STYLE_PRESETS.get(cfg.reply_style, STYLE_PRESETS["balanced"]))
+        return {name: getattr(cfg, name) for name in GATE_FIELDS}
 
     @staticmethod
     def remember(store: OrderedDict, key: str, value) -> None:
@@ -303,22 +312,27 @@ class Engine:
                 result = await self.judge.evaluate(state, stage, record["questions"])
                 record.update(result)
                 values = result["values"]
+                gates = self.gates()
                 if stage in ("pre", "probe"):
                     verdict = decide_intake(
                         values,
                         cfg.reply_style,
-                        intrusive_max=cfg.intrusive_block_threshold,
-                        join_intrusion_ceiling=cfg.join_intrusion_ceiling,
-                        continuation_min=cfg.continuation_threshold,
-                        addressed_min=cfg.addressed_threshold,
-                        worthwhile_min=cfg.worthwhile_min,
+                        **{k: gates[k] for k in (
+                            "intrusive_block_threshold",
+                            "join_intrusion_ceiling",
+                            "continuation_threshold",
+                            "addressed_threshold",
+                            "worthwhile_min",
+                        )},
                     )
                 else:
                     verdict = decide_review(
                         values,
-                        freshness_min=cfg.review_freshness_min,
-                        appropriate_min=cfg.review_appropriate_min,
-                        redundant_max=cfg.review_redundant_max,
+                        **{k: gates[k] for k in (
+                            "review_freshness_min",
+                            "review_appropriate_min",
+                            "review_redundant_max",
+                        )},
                     )
                 record.update(allowed=verdict.allowed, reason=verdict.reason)
                 if cfg.dry_run_enabled and not verdict.allowed:
