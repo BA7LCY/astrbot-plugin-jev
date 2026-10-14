@@ -154,6 +154,41 @@ def default_questions() -> dict:
     }
 
 
+_LEGACY_PRE_V1 = (
+    "state.conversation 是本会话近期消息（按时间从早到晚），state.target 是当前这条消息。\n\n"
+    "你在决定聊天机器人此刻要不要说话，而不是生成回复。\n\n机器人设定：{{persona}}\n\n要不要接话？"
+)
+_LEGACY_POST_V1 = (
+    "state.conversation 是本会话近期消息（按时间从早到晚），state.target 是触发回复的原消息，"
+    "state.candidate_reply 是机器人准备发送的候选回复。\n\n机器人设定：{{persona}}\n\n"
+    "这条候选回复现在还要不要发出去？"
+)
+_LEGACY_PRE_V2 = (
+    "这次判断针对群聊里的普通发言，对方没有点名呼叫机器人，只聊值不值得主动接话。\\\n"
+    "机器人定位是群里的普通参与者，不是等着被@的客服；宁可少说，也不要打断别人聊得正好。"
+)
+_LEGACY_POST_V2 = (
+    "现在只决定这条候选回复发不发，不改写内容。候选回复由主模型按人格和上下文生成，\\\n"
+    "发送之前复核它会不会显得突兀、重复或说错对象。"
+)
+
+# 历史上 policy.json 可能自动保存过内含默认模板的组合；迁移时命中这些原样文本视为未填写。
+LEGACY_PAIRS = [
+    (_LEGACY_PRE_V1, _LEGACY_POST_V1),
+    (_LEGACY_PRE_V2, _LEGACY_POST_V2),
+]
+
+
+def _fingerprint(text: str) -> str:
+    """只看文字内容，忽略空白和续行符，避免不同编辑器格式差异让识别失效。"""
+    return re.sub(r"[\s\\]", "", text)
+
+
+_LEGACY_FINGERPRINTS = {
+    _fingerprint(pre + "\n" + post) for pre, post in LEGACY_PAIRS
+}
+
+
 def stage_questions(stage: str) -> dict:
     """返回该阶段的题库：pre/probe 接话，post 发送复核（含时效）。final 不再单独出题，仅由撤回硬规则把关。"""
     if stage in ("pre", "probe"):
@@ -262,7 +297,11 @@ class Policy:
             legacy = (values.get("pre_prompt", ""), values.get("post_prompt", ""))
             if all(isinstance(text, str) for text in legacy):
                 parts = [text.strip() for text in legacy]
-                values = {"guidance": "\n".join(text for text in parts if text)}
+                merged = "\n".join(text for text in parts if text)
+                # 老模板默认原文不算用户填写，回到空偏好。
+                if _fingerprint(merged) in _LEGACY_FINGERPRINTS:
+                    merged = ""
+                values = {"guidance": merged}
         if not set(values) <= {"guidance", "overrides"}:
             raise ValueError("只允许 guidance 与 overrides 字段")
         text = values.get("guidance", "")

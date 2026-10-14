@@ -445,6 +445,11 @@ def test_policy_overrides_replace_with_guard_and_fallback(tmp_path):
 
 
 def test_legacy_policy_migrates_without_warning():
+    from jev.policy import LEGACY_PAIRS
+
+    for pre, post in LEGACY_PAIRS:
+        migrated = Policy.parse({"pre_prompt": pre, "post_prompt": post})
+        assert migrated == Policy()  # 默认模板原文不算是用户写的偏好
     legacy = {"pre_prompt": "别总提吃的", "post_prompt": ""}
     policy = Policy.parse(legacy)
     assert policy.guidance == "别总提吃的"
