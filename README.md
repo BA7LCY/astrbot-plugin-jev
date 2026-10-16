@@ -1,10 +1,20 @@
+<div align="center">
+
 # Jev 接话判断
 
-AstrBot 插件。机器人开口之前，先问决策模型一句「这句该不该接」；回复写完之后、发出去之前，再问一句「这句该不该发」。回复内容仍然由你在 AstrBot 里配置的语言模型和人格生成，本插件只决定发或不发，不改一个字。
+**让 Bot 先判断「该不该说」，再决定要不要开口。**
+
+接话前判断 · 发送前复核 · 撤回拦截 · 内嵌控制台
+
+[![Version](https://img.shields.io/badge/version-v2.0.0-287c78?style=flat-square)](CHANGELOG.md) [![AstrBot](https://img.shields.io/badge/AstrBot-%3E%3D4.27.4%20%3C5-52646f?style=flat-square)](https://github.com/AstrBotDevs/AstrBot) [![Python](https://img.shields.io/badge/Python-3.10%2B-3776ab?style=flat-square)](https://www.python.org/) [![Repository](https://img.shields.io/badge/Repository-BA7LCY%2Fastrbot--plugin--jev-181722?style=flat-square)](https://github.com/BA7LCY/astrbot-plugin-jev)
+
+[安装](#安装) · [接口入口](#接口入口) · [配置项](#配置项) · [配置设置](#配置设置) · [判断规则](#它是怎么判断的) · [控制台](#控制台) · [隐私边界](#边界与隐私) · [常见问题](#常见问题) · [更新日志](CHANGELOG.md)
+
+</div>
+
+AstrBot 插件。机器人开口之前，先问决策模型「这句该不该接」；回复写完之后、发出去之前，再问「这句该不该发」。回复内容仍然由你在 AstrBot 里配置的语言模型和人格生成，本插件只决定发或不发，不改一个字。
 
 判断分成三个场景：点名消息（@ / 唤醒词）、普通接话（没点名）、发送前复核。每个场景的题目和放行条件都在控制台的「配置设置」里改成 JSON；默认配置就是原来的「平衡」档，装上就能用。
-
-仓库地址：https://github.com/BA7LCY/astrbot-plugin-jev
 
 ## 你需要准备
 
@@ -26,7 +36,7 @@ AstrBot 插件。机器人开口之前，先问决策模型一句「这句该不
 | 入口 | `api_base` | `model` |
 | --- | --- | --- |
 | 官方 TypeSafe（默认） | `https://api.typesafe.ai` | `jev-latest` |
-| OpenRouter | `https://openrouter.ai/api` | `jev-latest` 或 `typesafe/jev-1.13` |
+| OpenRouter | `https://openrouter.ai/api` | `jev-latest`、`typesafe/jev-1.13` 或 `inception/mercury-decide:free` |
 | Vercel AI Gateway | `https://ai-gateway.vercel.sh/typesafe` | `typesafe-ai/jev` |
 
 ## 配置项
