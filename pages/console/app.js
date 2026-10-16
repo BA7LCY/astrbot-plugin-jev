@@ -169,8 +169,12 @@ document.querySelectorAll(".insert").forEach((button) => {
 });
 
 $("export-policy").onclick = () => action($("export-policy"), async () => {
-  await navigator.clipboard.writeText(JSON.stringify(draft(), null, 2));
-  notice("已把当前规则（含覆写）复制到剪贴板，可发给别人或存起来。");
+  // 部分环境（http 访问）没有剪贴板接口；填进只读框并全选，手动复制永远可用。
+  $("export-text").value = JSON.stringify(draft(), null, 2);
+  $("export-box").open = true;
+  $("export-text").focus();
+  $("export-text").select();
+  notice("已全选当前规则（含覆写），按 Ctrl+C 即可复制。");
 });
 $("import-fill").onclick = () => {
   try {
