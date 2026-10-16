@@ -168,22 +168,6 @@ document.querySelectorAll(".insert").forEach((button) => {
   };
 });
 
-$("export-policy").onclick = () => action($("export-policy"), async () => {
-  // 部分环境（http 访问）没有剪贴板接口；填进只读框并全选，手动复制永远可用。
-  $("export-text").value = JSON.stringify(draft(), null, 2);
-  $("export-box").open = true;
-  $("export-text").focus();
-  $("export-text").select();
-  notice("已全选当前规则（含覆写），按 Ctrl+C 即可复制。");
-});
-$("import-fill").onclick = () => {
-  try {
-    fill(JSON.parse($("import-text").value));
-    notice("已填入下方编辑区，确认无误后点「保存」。");
-  } catch {
-    notice("JSON 无法解析，检查是否完整复制。", true);
-  }
-};
 $("save-policy").onclick = () => action($("save-policy"), async () => {
   await bridge.apiPost("policy/save", draft()); notice("偏好已保存。下一次判断立即生效，旧判断保留原始快照。");
 });
