@@ -189,19 +189,19 @@
     "description": "接口密钥",
     "type": "string",
     "default": "",
-    "hint": "填你要用的那一家给的密钥，只写在这一行，不要写进提示词模板。密钥要和下面的接口地址配套：官方地址配官方密钥，OpenRouter 配 OpenRouter 的密钥。留空时每次判断都会失败，并按判断失败时的设置处理。"
+    "hint": "填你要用的那一家给的密钥，只写在这一行，不要写进提示词模板。留空时每次判断都会失败，并按判断失败时的设置处理。"
   },
   "api_base": {
     "description": "接口地址",
     "type": "string",
     "default": "https://api.typesafe.ai",
-    "hint": "只填地址本身，例如 https://api.typesafe.ai；请求路径 /v1/systemone 由插件自己补，末尾斜杠写不写都行。三家选一家：官方 https://api.typesafe.ai（默认）、OpenRouter https://openrouter.ai/api、Vercel AI Gateway https://ai-gateway.vercel.sh/typesafe。必须是 https 的公网地址；带账号密码、带问号参数、或写内网和本机地址（如 127.0.0.1、192.168.x.x）都会启动失败。换地址记得同时换密钥和模型名。"
+    "hint": "只填地址本身，例如 https://api.typesafe.ai；请求路径 /v1/systemone 由插件自己补，末尾斜杠写不写都行。"
   },
   "model": {
     "description": "模型名",
     "type": "string",
     "default": "jev-latest",
-    "hint": "三家的叫法不一样，别照抄。官方：jev-latest，也可填官方给的固定版本号。OpenRouter：jev-latest 或 typesafe/jev-1.13。Vercel AI Gateway：typesafe-ai/jev。填错会得到接口报错。"
+    "hint": "填错会得到接口报错。"
   },
   "timeout_seconds": {
     "description": "单次判断最多等几秒",
