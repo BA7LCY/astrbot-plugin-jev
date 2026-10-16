@@ -44,7 +44,6 @@
         <div class="row"><button type="button" class="quiet insert" data-target="guidance">插入人格变量</button></div>
         <textarea id="guidance" rows="8" maxlength="6000" spellcheck="false" placeholder="多接梗、少说教，回答简短一点。"></textarea>
         
-        <details><summary>展开预览 · 不调用模型</summary><div class="toolbar"><label for="preview-session">会话快照</label><select id="preview-session"><option value="">无会话 / 空人格</option></select><button id="preview" class="secondary">预览当前草稿</button></div><p id="preview-note" class="hint"></p><pre id="preview-output">选择会话快照后点「预览当前草稿」，即可看到偏好拼进题目后的完整指令样例。</pre></details>
         <details id="overrides-box"><summary>高级：提示词覆写</summary><p class="hint">每个框里直接显示内置原文：改成别的话=替换这题；把框清空=这题不参与判断。防注入提示会自动保留，看不到也删不掉。每题右侧按钮一键填回内置原文。</p><div id="overrides"></div></details><div class="toolbar"><button id="save-policy">保存</button><button id="reset-policy" class="secondary">恢复默认</button><span class="muted">恢复默认（偏好清空、覆写全删、全部题恢复内置原文）只改页面上的内容，点保存才真正生效。</span></div>
       </section>
     </div>

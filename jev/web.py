@@ -68,10 +68,6 @@ def build_handlers(state: dict[str, Engine | None], policy_path: Path | None) ->
                 "last_decision": current.last_decision,
                 "recall_support": "OneBot v11 group_recall / friend_recall",
                 "scope": "AstrBot pipeline replies; direct tool/plugin sends excluded",
-                "sessions": [
-                    {"id": key, "persona_id": item.persona_id}
-                    for key, item in current.personas.items()
-                ],
             }
         )
 
@@ -119,42 +115,6 @@ def build_handlers(state: dict[str, Engine | None], policy_path: Path | None) ->
             current.policy = updated
         return json_response({"policy": asdict(updated)})
 
-    async def preview():
-        current = state.get("engine")
-        if current is None:
-            return error_response("插件未就绪", status_code=503)
-        try:
-            body = await request.json(default={})
-            draft = Policy.parse(body["policy"])
-            session_id = body.get("session", "")
-            if not isinstance(session_id, str):
-                raise ValueError
-        except (ValueError, KeyError, TypeError):
-            return error_response("预览参数不合法", status_code=400)
-        snapshot = current.personas.get(session_id)
-        persona_text = snapshot.persona if snapshot else ""
-        if not draft.uses_persona:
-            note = "草稿未写 {{persona}}，人格不会进入请求。"
-        elif not persona_text:
-            note = (
-                "草稿引用了 {{persona}}，但该会话快照没有人格文本；"
-                "在群里发一条新消息后再预览即可看到真实取值。"
-            )
-        else:
-            note = "预览使用所选会话最近的已解析快照；真实判断时重新读取当前人格。"
-        return json_response(
-            {
-                "guidance": draft.render("pre", persona_text),
-                "sample": draft.questions("pre", persona_text).get("worthwhile", {}).get(
-                    "instructions", ""
-                ),
-                "persona_id": snapshot.persona_id if snapshot else "",
-                "persona_status": snapshot.persona_status if snapshot else "no_session",
-                "persona_chars": len(persona_text),
-                "note": note,
-            }
-        )
-
     async def probe():
         current = state.get("engine")
         if current is None:
@@ -182,6 +142,5 @@ def build_handlers(state: dict[str, Engine | None], policy_path: Path | None) ->
         "questions": (guard(get_questions), ["GET"]),
         "policy": (guard(get_policy), ["GET"]),
         "policy/save": (guard(save_policy), ["POST"]),
-        "preview": (guard(preview), ["POST"]),
         "probe": (guard(probe), ["POST"]),
     }

@@ -119,12 +119,6 @@ async function status() {
     const state = document.createElement("span"); state.textContent = value ? "开启" : "关闭";
     state.className = value ? "on" : "off"; item.append(name, state); $("switches").append(item);
   }
-  const selected = $("preview-session").value;
-  $("preview-session").replaceChildren(new Option("无会话 / 空人格", ""));
-  for (const session of data.sessions) {
-    $("preview-session").add(new Option(`${session.persona_id || "未解析人格"} · ${session.id}`, session.id));
-  }
-  if (data.sessions.some((session) => session.id === selected)) $("preview-session").value = selected;
 }
 async function history(reset = true) {
   const data = await bridge.apiGet("history", { before: reset ? 0 : cursor });
@@ -172,11 +166,6 @@ $("save-policy").onclick = () => action($("save-policy"), async () => {
   await bridge.apiPost("policy/save", draft()); notice("偏好已保存。下一次判断立即生效，旧判断保留原始快照。");
 });
 $("reset-policy").onclick = () => { if (defaults) fill(defaults); notice("已清空偏好，尚未保存。"); };
-$("preview").onclick = () => action($("preview"), async () => {
-  const data = await bridge.apiPost("preview", { policy: draft(), session: $("preview-session").value });
-  $("preview-note").textContent = `${data.note} 人格状态：${data.persona_status} ${data.persona_id} / ${data.persona_chars} 字符`;
-  $("preview-output").textContent = `【聊天偏好】\n${data.guidance}\n\n【拼进题目后的接话题样例】\n${data.sample}`;
-});
 $("probe").onclick = () => action($("probe"), async () => {
   const data = await bridge.apiPost("probe", {}); $("probe-output").textContent = JSON.stringify(data, null, 2);
   await status(); notice(data.last_decision.reason === "judge_error" ? "连接测试失败，请查看历史记录中的错误码。" : "连接测试完成。", data.last_decision.reason === "judge_error");

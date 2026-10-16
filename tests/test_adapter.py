@@ -315,7 +315,7 @@ async def test_plugin_lifecycle_without_real_credentials():
     assert plugin.adapter is not None
     assert set(registered) == {
         f"/astrbot_plugin_jev/{name}"
-        for name in ("status", "history", "policy", "policy/save", "preview", "probe")
+        for name in ("status", "history", "policy", "policy/save", "probe")
     }
     await plugin.terminate()
     assert plugin.session is None

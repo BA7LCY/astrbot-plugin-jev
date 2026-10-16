@@ -11,7 +11,7 @@ from test_core import Judge
 
 from jev.client import JevClient, JevError
 from jev.config import Settings
-from jev.engine import Engine, Message
+from jev.engine import Engine
 from jev.history import History
 from jev.policy import Policy
 from jev.web import build_handlers
@@ -210,7 +210,6 @@ async def test_status_reports_state_and_never_leaks_secrets(console):
     assert "api_key" not in json.dumps(data)
 
 
-POLICY_BODY = {"preview"}
 VALID = asdict(Policy("前 {{persona}}", "后 {{persona}}"))
 
 
@@ -218,8 +217,7 @@ async def test_every_endpoint_reports_unready_without_engine(console):
     handlers, _, state = console
     state["engine"] = None
     for endpoint, (handler, _) in handlers.items():
-        body = {"policy": {}, "session": ""} if endpoint in POLICY_BODY else None
-        status, _ = await call(handler, "POST", None, body)
+        status, _ = await call(handler, "POST", None, None)
         assert status == 503, endpoint
 
 
@@ -236,39 +234,6 @@ async def test_policy_roundtrip_validation_and_missing_store(console):
     assert engine.policy.pre_prompt == "前 {{persona}}"
     orphans = build_handlers({"engine": engine}, None)
     assert (await call(orphans["policy/save"][0], "POST", None, VALID))[0] == 409
-
-
-async def test_preview_uses_resolved_persona_snapshot_without_deciding(console):
-    handlers, engine, _ = console
-    await call(handlers["policy/save"][0], "POST", None, VALID)
-    engine.observe(
-        Message("g", "1", "u", "x", persona="会话人格", persona_status="resolved")
-    )
-    engine.observe(Message("g", "bot:1", "bot", "hello", role="assistant"))
-    status, data = await call(
-        handlers["preview"][0], "POST", None, {"policy": VALID, "session": "g"}
-    )
-    assert status == 200
-    assert data["pre"] == "前 会话人格"
-    assert data["post"] == "后 会话人格"
-    assert data["persona_status"] == "resolved"
-    assert data["persona_chars"] == len("会话人格")
-    assert engine.decisions == 0
-    plain = asdict(Policy("前", "后"))
-    _, unused = await call(
-        handlers["preview"][0], "POST", None, {"policy": plain, "session": "g"}
-    )
-    assert unused["pre"] == "前" and "未写 {{persona}}" in unused["note"]
-    _, snapshotless = await call(
-        handlers["preview"][0], "POST", None, {"policy": VALID, "session": "other"}
-    )
-    assert snapshotless["persona_chars"] == 0
-    assert "没有人格文本" in snapshotless["note"]
-    assert (await call(handlers["preview"][0], "POST", None, {"policy": VALID}))[
-        0
-    ] == 200
-    status, _ = await call(handlers["preview"][0], "POST", None, {"policy": "nope"})
-    assert status == 400
 
 
 async def test_probe_writes_history_and_history_paginates(console):
