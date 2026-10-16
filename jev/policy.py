@@ -37,7 +37,7 @@ INTAKE_QUESTIONS = {
     ),
     "worthwhile": question(
         "Would a short in-character response add something welcome here?",
-        "Useful contribution, empathy, reaction, shared joke or meaningful follow-up. It need not be a question.",
+        "A useful reply, empathy, reaction, joke, follow-up, or a direct question to this bot. Simple or unclear questions still count.",
         "Repetitive advice, forced help, empty acknowledgment, repeating what others already said."
         " A bare mention with no content, a repeated shout-out, or an insulting mention to this bot "
         "is also not worth an answer.",
