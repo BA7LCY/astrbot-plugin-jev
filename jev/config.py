@@ -48,7 +48,6 @@ def normalize_api_base(value: str) -> str:
     return base
 
 
-STYLE_ALIASES = {"安静": "quiet", "平衡": "balanced", "活泼": "sociable"}
 SCOPE_ALIASES = {"同群": "group", "同人": "sender", "全局": "global"}
 
 
@@ -70,7 +69,6 @@ class Settings:
     pre_check_enabled: bool = True
     post_check_enabled: bool = True
     recall_enabled: bool = True
-    custom_gates_enabled: bool = False
 
     burst_merge_enabled: bool = False
     dry_run_enabled: bool = False
@@ -80,17 +78,8 @@ class Settings:
     bypass_addressed_whitelist: list[str] = field(default_factory=list)
     busy_lock_enabled: bool = True
     busy_lock_scope: str = "同群"
-    reply_style: str = "平衡"
     burst_window_seconds: float = 1.5
     reply_cooldown_seconds: float = 0.0
-    intrusive_block_threshold: float = 0.45
-    join_intrusion_ceiling: float = 0.20
-    continuation_threshold: float = 0.70
-    addressed_threshold: float = 0.80
-    worthwhile_min: float = 0.50
-    review_appropriate_min: float = 0.75
-    review_redundant_max: float = 0.35
-    review_freshness_min: float = 0.5
     busy_lock_timeout_seconds: int = 180
     fail_open: bool = False
     api_key: str = ""
@@ -115,16 +104,6 @@ class Settings:
             ValueError: 配置类型、范围或鉴权设置不合法。
         """
         defaults = cls()
-        if "custom_gates_enabled" not in values and "gates_follow_style" in values:
-            # 老字段取反迁移：跟随开启=自定义关闭。
-            values = dict(values)
-            values["custom_gates_enabled"] = not values["gates_follow_style"]
-        nested = values.get("custom_gates")
-        if nested is not None:
-            if not isinstance(nested, dict):
-                raise ValueError("Invalid setting: custom_gates")
-            # 面板把自定义档线收成折叠组，在对象里；读配置时摊平回顶层。
-            values = {**values, **nested}
         data = {}
         for field in fields(cls):
             default = getattr(defaults, field.name)
@@ -152,22 +131,11 @@ class Settings:
         data["busy_lock_scope"] = alias(
             data["busy_lock_scope"], SCOPE_ALIASES, "busy_lock_scope", "group"
         )
-        data["reply_style"] = alias(
-            data["reply_style"], STYLE_ALIASES, "reply_style", "balanced"
-        )
         result = cls(**data)
         ranges = {
             "timeout_seconds": (0.1, 60),
 
             "text_limit": (100, 4000),
-            "intrusive_block_threshold": (0, 1),
-            "join_intrusion_ceiling": (0, 1),
-            "continuation_threshold": (0, 1),
-            "addressed_threshold": (0, 1),
-            "worthwhile_min": (0, 1),
-            "review_appropriate_min": (0, 1),
-            "review_redundant_max": (0, 1),
-            "review_freshness_min": (0, 1),
             "burst_window_seconds": (0.2, 10),
             "reply_cooldown_seconds": (0, 600),
             "history_limit": (1, 10000),

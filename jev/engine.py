@@ -12,14 +12,7 @@ from typing import Protocol
 from .client import JevError
 from .config import Settings
 from .history import History
-from .policy import (
-    GATE_FIELDS,
-    STYLE_PRESETS,
-    Policy,
-    decide_addressed,
-    decide_intake,
-    decide_review,
-)
+from .policy import Policy
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +21,7 @@ CONVERSATION_BUDGET = 12000
 
 
 class Judge(Protocol):
-    async def evaluate(self, state: dict, stage: str, instructions: str) -> dict: ...
+    async def evaluate(self, state: dict, stage: str, questions: dict) -> dict: ...
 
 
 @dataclass
@@ -123,7 +116,6 @@ class Engine:
         self.burst: OrderedDict[str, int] = OrderedDict()
         self.last_spoke: dict[str, float] = {}
         self.recent_lines: OrderedDict[str, list] = OrderedDict()
-        self.burst: OrderedDict[str, int] = OrderedDict()
         self.last_decision: dict | None = None
         self.history_error = False
         self.decisions = 0
@@ -135,13 +127,6 @@ class Engine:
         return self.settings.enabled and (
             self.settings.private_enabled if private else self.settings.group_enabled
         )
-
-    def gates(self) -> dict:
-        """本轮判断用的八条档线；自定义闸门开关开了用用户自填，否则用参与程度预设。"""
-        cfg = self.settings
-        if cfg.custom_gates_enabled:
-            return {name: getattr(cfg, name) for name in GATE_FIELDS}
-        return dict(STYLE_PRESETS.get(cfg.reply_style, STYLE_PRESETS["balanced"]))
 
     @staticmethod
     def remember(store: OrderedDict, key: str, value) -> None:
@@ -300,7 +285,11 @@ class Engine:
             "values": None,
             "allowed": True,
             "reason": "disabled",
-            "questions": policy.questions(stage, message.persona),
+            "questions": policy.questions(
+                "review" if stage == "post"
+                else ("addressed" if message.addressed else "intake"),
+                message.persona,
+            ),
         }
         start = time.monotonic()
         if cfg.recall_enabled and message.recalled:
@@ -322,43 +311,21 @@ class Engine:
             cfg.pre_check_enabled if stage == "pre" else cfg.post_check_enabled
         ):
             questions = record["questions"]
-            if stage == "pre" and message.addressed:
-                # 被 @ 只问「值得」一题；题被停用时整个预判断变零题放行。
-                worthwhile = questions.get("worthwhile")
-                questions = {"worthwhile": worthwhile} if worthwhile else {}
-                record["questions"] = questions
             if not questions:
-                # 该阶段没有任何题：本次零判放行（含被 @ 且「值得」题已停用的情况）。
+                # 该场景没有任何题：本次零判放行。
                 record.update(allowed=True, reason="no_questions")
             else:
                 try:
-                    result = await self.judge.evaluate(state, stage, questions)
+                    result = await self.judge.evaluate(
+                        state, stage, Policy.request_questions(questions)
+                    )
                     record.update(result)
                     values = result["values"]
-                    gates = self.gates()
-                    if stage == "pre" and message.addressed:
-                        verdict = decide_addressed(values, gates["worthwhile_min"])
-                    elif stage in ("pre", "probe"):
-                        verdict = decide_intake(
-                            values,
-                            cfg.reply_style,
-                            **{k: gates[k] for k in (
-                                "intrusive_block_threshold",
-                                "join_intrusion_ceiling",
-                                "continuation_threshold",
-                                "addressed_threshold",
-                                "worthwhile_min",
-                            )},
-                        )
-                    else:
-                        verdict = decide_review(
-                            values,
-                            **{k: gates[k] for k in (
-                                "review_freshness_min",
-                                "review_appropriate_min",
-                                "review_redundant_max",
-                            )},
-                        )
+                    module = (
+                        "review" if stage == "post"
+                        else ("addressed" if message.addressed else "intake")
+                    )
+                    verdict = policy.decide(module, values)
                     record.update(allowed=verdict.allowed, reason=verdict.reason)
                     if cfg.dry_run_enabled and not verdict.allowed:
                         # 影子模式：记录“本会拦截”，实际放行，只有撤回硬规则不受影响。

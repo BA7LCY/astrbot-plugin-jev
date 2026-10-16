@@ -1,6 +1,6 @@
 import json
 from collections import deque
-from dataclasses import replace
+from dataclasses import asdict, replace
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
 
@@ -165,15 +165,15 @@ async def test_group_context_copied_from_host_deque(adapter):
     )
     await adapter.receive(msg)
     state = adapter.engine.judge.calls[0][0]
-    assert state["conversation"] == ["[小明/13:05]:  在吗"]
-    assert state["target"].startswith("用户：")
+    assert state["recent_conversation"] == ["[小明/13:05]:  在吗"]
+    assert state["target_message"].startswith("用户：")
 
 
 async def test_group_context_stays_empty_without_host_records(adapter):
     msg = event()
     adapter.context = host_context()
     await adapter.receive(msg)
-    assert adapter.engine.judge.calls[0][0]["conversation"] == []
+    assert adapter.engine.judge.calls[0][0]["recent_conversation"] == []
 
 
 async def test_private_context_copied_from_conversation_history(adapter):
@@ -186,7 +186,7 @@ async def test_private_context_copied_from_conversation_history(adapter):
         ]
     )
     await adapter.receive(event(private=True))
-    assert adapter.engine.judge.calls[0][0]["conversation"] == [
+    assert adapter.engine.judge.calls[0][0]["recent_conversation"] == [
         "对方：在吗",
         "机器人：在的",
     ]
@@ -264,16 +264,25 @@ def persona_context(resolver):
     )
 
 
+def policy_with_persona():
+    data = asdict(Policy())
+    data["addressed"]["questions"]["worthwhile"]["instructions"] += " {{persona}}"
+    return Policy.parse(data)
+
+
 async def test_persona_resolves_session_selection(adapter):
     resolver = AsyncMock(
         return_value=("forced-persona", {"prompt": "这是会话指定人格"}, None, False)
     )
     adapter.context = persona_context(resolver)
+    adapter.engine.policy = policy_with_persona()
     msg = event()
     await adapter.receive(msg)
     captured = msg.get_extra("jev_message")
     assert captured.persona_id == "forced-persona"
-    assert "这是会话指定人格" in adapter.engine.judge.calls[0][2]
+    assert "这是会话指定人格" in json.dumps(
+        adapter.engine.judge.calls[0][2], ensure_ascii=False
+    )
     assert (
         resolver.call_args.kwargs["conversation_persona_id"] == "conversation-persona"
     )
@@ -283,7 +292,7 @@ async def test_persona_resolves_session_selection(adapter):
 async def test_template_without_persona_variable_skips_host(adapter):
     resolver = AsyncMock()
     adapter.context = persona_context(resolver)
-    adapter.engine.policy = Policy("沉默规则", "发送？")
+    adapter.engine.policy = Policy()
     msg = event()
     await adapter.receive(msg)
     resolver.assert_not_awaited()

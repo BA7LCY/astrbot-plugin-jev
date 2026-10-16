@@ -20,7 +20,7 @@ class JevClient:
         self.slots = asyncio.Semaphore(4)
 
     async def evaluate(self, state: dict, stage: str, questions: dict) -> dict:
-        """提交一组 Noul 判断题；总超时包含并发排队时间。
+        """提交一组结构化判断题；总超时包含并发排队时间。
 
         Questions are sent verbatim; this layer does not invent criteria.
 
@@ -84,17 +84,34 @@ class JevClient:
                     if not isinstance(body["model"], str):
                         raise ValueError
                     values = {}
-                    for name in questions:
+                    for name, question in questions.items():
                         answer = answers[name]
-                        probability = answer["noul"]
-                        if (
-                            answer["type"] != "noul"
-                            or type(probability) not in (int, float)
-                            or not math.isfinite(probability)
-                            or not 0 <= probability <= 1
-                        ):
+                        if answer["type"] != question["type"]:
                             raise ValueError
-                        values[name] = float(probability)
+                        if question["type"] == "noul":
+                            value = answer["noul"]
+                            if (
+                                type(value) not in (int, float)
+                                or not math.isfinite(value)
+                                or not 0 <= value <= 1
+                            ):
+                                raise ValueError
+                            values[name] = float(value)
+                        elif question["type"] == "choice":
+                            value = answer["choice"]
+                            if not isinstance(value, str) or value not in question["criteria"]:
+                                raise ValueError
+                            values[name] = value
+                        else:
+                            value = answer["score"]
+                            upper = len(question["criteria"]) - 1
+                            if (
+                                type(value) not in (int, float)
+                                or not math.isfinite(value)
+                                or not 0 <= value <= upper
+                            ):
+                                raise ValueError
+                            values[name] = float(value)
                     if not values:
                         raise ValueError
                     usage = body.get("usage", {})
