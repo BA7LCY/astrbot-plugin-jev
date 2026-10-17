@@ -296,9 +296,11 @@ class Policy:
 
     @classmethod
     def parse(cls, values: dict) -> "Policy":
-        """解析新版三模块配置；v1.2 的 guidance/overrides 自动迁移。"""
+        """解析磁盘或控制台提交的配置；注释原文可往返保留。"""
         if not isinstance(values, dict):
             raise ValueError("policy 必须是映射")
+        if set(values) == {"policy_text"}:
+            return cls.parse_text(values["policy_text"])
         if set(values) <= {"guidance", "overrides"} and "guidance" in values:
             overrides = values.get("overrides") or {}
             if not isinstance(overrides, dict):
@@ -329,6 +331,14 @@ class Policy:
                     f"{name} 不是合法 JSON：第 {error.lineno} 行第 {error.colno} 列"
                 ) from None
         return cls.parse(modules)
+
+    @classmethod
+    def canonical_text(cls) -> dict[str, str]:
+        """返回不带注释的标准 JSON 文本，用于没有原文时的兜底展示。"""
+        return {
+            name: json.dumps(getattr(cls(), name), ensure_ascii=False, indent=2)
+            for name in MODULES
+        }
 
     def questions(self, module: str, persona: str) -> dict:
         """返回历史快照题目；label 保留，题面替换变量并强拼防注入说明。"""
@@ -366,14 +376,37 @@ class Policy:
                 return Verdict(True, reason)
         return Verdict(False, "没有任何一组放行条件满足")
 
-    def save(self, path: Path) -> None:
-        """原子保存配置，并保留上一份备份。"""
+    def stored_text(self, path: Path | None) -> dict[str, str]:
+        """返回控制台应展示的配置原文；文件损坏时退回标准 JSON。"""
+        if path is None or not path.exists():
+            return default_policy_text() if self == Policy() else self.canonical_text()
+        try:
+            values = json.loads(path.read_text(encoding="utf-8"))
+            text = values.get("policy_text") if isinstance(values, dict) else None
+            if isinstance(text, dict) and Policy.parse_text(text) == self:
+                return {name: text[name] for name in MODULES}
+        except (OSError, ValueError, json.JSONDecodeError):
+            pass
+        return default_policy_text() if self == Policy() else self.canonical_text()
+
+    def save(self, path: Path, source_text: dict[str, str] | None = None) -> None:
+        """原子保存配置原文，并保留上一份备份。
+
+        source_text 是控制台提交的 JSONC 原文；保存后注释仍能往返展示。
+        不提供原文时保存标准 JSON，供测试和内部调用使用。
+        """
+        if source_text is None:
+            stored = asdict(self)
+        else:
+            if Policy.parse_text(source_text) != self:
+                raise ValueError("配置原文与解析结果不一致")
+            stored = {"policy_text": {name: source_text[name] for name in MODULES}}
         path.parent.mkdir(parents=True, exist_ok=True)
         if path.exists():
             path.with_suffix(".json.bak").write_bytes(path.read_bytes())
         temporary = path.with_suffix(".json.tmp")
         temporary.write_text(
-            json.dumps(asdict(self), ensure_ascii=False, indent=2),
+            json.dumps(stored, ensure_ascii=False, indent=2),
             encoding="utf-8",
         )
         temporary.replace(path)

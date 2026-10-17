@@ -1,7 +1,6 @@
 """AstrBot 内嵌 Pages 的后端 handler；不自行监听端口，鉴权由宿主登录态负责。"""
 
 import asyncio
-import json
 import sqlite3
 from collections.abc import Awaitable, Callable
 from dataclasses import fields
@@ -11,7 +10,7 @@ from astrbot.api.web import error_response, json_response, request
 
 from .config import Settings
 from .engine import Engine, Message
-from .policy import MODULES, Policy
+from .policy import Policy
 from .policy_defaults import default_policy_text
 
 
@@ -27,13 +26,6 @@ def build_handlers(state: dict[str, Engine | None], policy_path: Path | None) ->
     """
     probe_lock = asyncio.Lock()
     policy_lock = asyncio.Lock()
-
-    def policy_text(policy: Policy) -> dict[str, str]:
-        """把当前配置转成控制台编辑器使用的三段 JSON 文本。"""
-        return {
-            name: json.dumps(getattr(policy, name), ensure_ascii=False, indent=2)
-            for name in MODULES
-        }
 
     def guard(handler: Callable[[], Awaitable]) -> Callable:
         """把存储故障转成不含敏感细节的状态码。
@@ -103,7 +95,7 @@ def build_handlers(state: dict[str, Engine | None], policy_path: Path | None) ->
             return error_response("插件未就绪", status_code=503)
         return json_response(
             {
-                "policy_text": policy_text(current.policy),
+                "policy_text": current.policy.stored_text(policy_path),
                 "defaults_text": default_policy_text(),
             }
         )
@@ -118,13 +110,14 @@ def build_handlers(state: dict[str, Engine | None], policy_path: Path | None) ->
             body = await request.json(default={})
             if not isinstance(body, dict) or set(body) != {"policy_text"}:
                 raise ValueError("请求格式不正确")
-            updated = Policy.parse_text(body["policy_text"])
+            source_text = body["policy_text"]
+            updated = Policy.parse_text(source_text)
         except (ValueError, TypeError):
             return error_response("配置 JSON 格式不合法", status_code=400)
         async with policy_lock:
-            await asyncio.to_thread(updated.save, policy_path)
+            await asyncio.to_thread(updated.save, policy_path, source_text)
             current.policy = updated
-        return json_response({"policy_text": policy_text(updated)})
+        return json_response({"policy_text": updated.stored_text(policy_path)})
 
     async def probe():
         current = state.get("engine")

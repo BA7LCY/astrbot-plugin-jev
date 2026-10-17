@@ -14,6 +14,7 @@ from jev.config import Settings
 from jev.engine import Engine
 from jev.history import History
 from jev.policy import Policy
+from jev.policy_defaults import default_policy_text
 from jev.web import build_handlers
 
 
@@ -302,6 +303,22 @@ async def test_policy_roundtrip_validation_and_missing_store(console):
     assert (
         await call(orphans["policy/save"][0], "POST", None, {"policy_text": VALID_TEXT})
     )[0] == 409
+
+
+async def test_policy_save_preserves_editor_comments(console):
+    handlers, engine, _ = console
+    texts = default_policy_text()
+    texts["addressed"] = texts["addressed"].replace('"over": 0.50', '"over": 0.51')
+
+    status, saved = await call(
+        handlers["policy/save"][0], "POST", None, {"policy_text": texts}
+    )
+    assert status == 200
+    assert saved["policy_text"] == texts
+    assert engine.policy.addressed["pass"][0]["all"][0]["over"] == 0.51
+
+    _, loaded = await call(handlers["policy"][0])
+    assert loaded["policy_text"] == texts
 
 
 async def test_probe_writes_history_and_history_paginates(console):

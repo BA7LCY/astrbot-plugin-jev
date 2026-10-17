@@ -449,6 +449,27 @@ def test_policy_questions_guard_labels_and_legacy_migration():
         Policy.parse({"guidance": "", "overrides": {"unknown": {"instructions": "x"}}})
 
 
+def test_policy_comments_survive_save_and_default_restore(tmp_path):
+    from jev.policy_defaults import default_policy_text
+
+    texts = default_policy_text()
+    texts["addressed"] = texts["addressed"].replace('"over": 0.50', '"over": 0.51')
+    policy = Policy.parse_text(texts)
+    path = tmp_path / "policy.json"
+    policy.save(path, texts)
+
+    stored = json.loads(path.read_text(encoding="utf-8"))
+    assert stored == {"policy_text": texts}
+    assert Policy.parse(stored) == policy
+    assert policy.stored_text(path) == texts
+
+    defaults = default_policy_text()
+    Policy().save(path, defaults)
+    restored = Policy.parse(json.loads(path.read_text(encoding="utf-8")))
+    assert restored == Policy()
+    assert restored.stored_text(path) == defaults
+
+
 def test_policy_text_validation_and_atomic_persistence(tmp_path):
     from jev.policy_defaults import default_policy_text
 
