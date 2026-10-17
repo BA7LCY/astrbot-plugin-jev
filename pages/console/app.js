@@ -87,13 +87,6 @@ async function action(button, work) {
   try { await work(); } catch (error) { notice(error.message, true); }
   finally { button.disabled = false; }
 }
-async function loadPolicy() {
-  const data = await bridge.apiGet("policy/v2");
-  if (!data?.policy_text || !data?.defaults_text) {
-    throw new Error("插件后端不是 v2 配置接口，请重载插件或清理旧版本文件。");
-  }
-  return data;
-}
 document.querySelectorAll("[data-tab]").forEach((button) => {
   button.onclick = () => {
     document.querySelectorAll(".tab-panel").forEach((panel) => { panel.hidden = panel.id !== button.dataset.tab; });
@@ -101,7 +94,7 @@ document.querySelectorAll("[data-tab]").forEach((button) => {
   };
 });
 $("save-policy").onclick = () => action($("save-policy"), async () => {
-  await bridge.apiPost("policy/save/v2", draft());
+  await bridge.apiPost("policy/save", draft());
   notice("配置已保存。下一次判断立即生效，旧判断保留原始快照。");
 });
 $("probe").onclick = () => action($("probe"), async () => {
@@ -116,7 +109,7 @@ async function connect() {
   try {
   await bridge.ready();
   await status();
-  const data = await loadPolicy();
+  const data = await bridge.apiGet("policy");
   defaultsText = data.defaults_text || {};
   setupPolicyEditors(defaultsText);
   fill(data.policy_text);

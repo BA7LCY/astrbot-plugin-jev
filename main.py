@@ -19,11 +19,6 @@ from .jev.policy import Policy
 from .jev.web import build_handlers
 
 PLUGIN_NAME = "astrbot_plugin_jev"
-# v2 的配置请求结构不兼容 v1.2，路由分开，避免旧实例残留时互相串线。
-WEB_API_ROUTES = {
-    "policy": "policy/v2",
-    "policy/save": "policy/save/v2",
-}
 
 
 class JevPlugin(Star):
@@ -64,7 +59,7 @@ class JevPlugin(Star):
                 self.engine_slot, policy_path
             ).items():
                 self.context.register_web_api(
-                    f"/{PLUGIN_NAME}/{WEB_API_ROUTES.get(endpoint, endpoint)}",
+                    f"/{PLUGIN_NAME}/{endpoint}",
                     handler,
                     methods,
                     f"Jev {endpoint}",

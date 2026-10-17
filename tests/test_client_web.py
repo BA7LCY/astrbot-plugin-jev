@@ -348,9 +348,6 @@ def test_embedded_page_dropped_token_channel():
     assert (root / "style.css").exists()
     assert "./app.js" in html and "./style.css" in html
     assert "/assets/" not in html
-    assert 'apiGet("policy/v2")' in scripts
-    assert 'apiPost("policy/save/v2", draft())' in scripts
-    assert "插件后端不是 v2 配置接口" in scripts
     for leaked in ("Authorization", "Bearer", "token", "fetch("):
         assert leaked not in scripts
     assert "window.AstrBotPluginPage" in scripts

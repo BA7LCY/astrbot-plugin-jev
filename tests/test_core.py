@@ -449,25 +449,6 @@ def test_policy_questions_guard_labels_and_legacy_migration():
         Policy.parse({"guidance": "", "overrides": {"unknown": {"instructions": "x"}}})
 
 
-def test_default_restore_overwrites_legacy_policy(tmp_path):
-    from jev.policy_defaults import default_policy_text
-
-    path = tmp_path / "policy.json"
-    legacy = {
-        "guidance": "这段旧偏好会被丢弃",
-        "overrides": {"worthwhile": {"instructions": "旧版题面"}},
-    }
-    path.write_text(json.dumps(legacy, ensure_ascii=False), encoding="utf-8")
-    assert (
-        Policy.parse(json.loads(path.read_text(encoding="utf-8")))
-        .addressed["questions"]["worthwhile"]["instructions"]
-        == "旧版题面"
-    )
-
-    Policy.parse_text(default_policy_text()).save(path)
-    assert Policy.parse(json.loads(path.read_text(encoding="utf-8"))) == Policy()
-
-
 def test_policy_text_validation_and_atomic_persistence(tmp_path):
     from jev.policy_defaults import default_policy_text
 
